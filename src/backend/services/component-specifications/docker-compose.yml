@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  component-specifications:
+    build: .
+    ports:
+      - "8003:8003"
+    environment:
+      - DATABASE_URL=sqlite:///./component_specifications.db
+      - PYTHONPATH=/app
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8003/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Optional PostgreSQL database (uncomment if using PostgreSQL)
+  # postgres:
+  #   image: postgres:15
+  #   environment:
+  #     - POSTGRES_DB=component_specifications
+  #     - POSTGRES_USER=postgres
+  #     - POSTGRES_PASSWORD=password
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   ports:
+  #     - "5432:5432"
+
+# volumes:
+#   postgres_data:
