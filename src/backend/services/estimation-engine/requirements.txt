@@ -1,0 +1,128 @@
+# AI-Powered Estimation Engine Dependencies
+# Story 4.2: AI-Powered Man-Hour Estimation
+
+# FastAPI and web framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+starlette==0.27.0
+pydantic==2.5.0
+python-multipart==0.0.6
+
+# Machine Learning Core
+scikit-learn==1.3.2
+numpy==1.24.3
+pandas==2.1.4
+scipy==1.11.4
+joblib==1.3.2
+
+# Deep Learning
+tensorflow==2.14.0
+torch==2.1.0
+torchvision==0.16.0
+keras==2.14.0
+
+# Advanced ML Libraries
+xgboost==2.0.1
+lightgbm==4.1.0
+catboost==1.2.2
+
+# Feature Engineering
+feature-engine==1.6.2
+category-encoders==2.6.2
+imbalanced-learn==0.11.0
+
+# Time Series and Forecasting
+statsmodels==0.14.0
+fbprophet==0.7.1
+# prophet==1.1.4
+
+# MLOps and Model Management
+mlflow==2.8.1
+optuna==3.4.0
+wandb==0.16.0
+
+# Data Processing
+numpy==1.24.3
+pandas==2.1.4
+polars==0.19.19
+dask==2023.12.0
+
+# Visualization and Analysis
+matplotlib==3.8.2
+seaborn==0.13.0
+plotly==5.17.0
+shap==0.43.0
+
+# Database and Storage
+sqlalchemy==2.0.23
+psycopg2-binary==2.9.9
+redis==5.0.1
+
+# Async and Performance
+aiofiles==23.2.1
+aioredis==2.0.1
+asyncio-throttle==1.0.2
+numba==0.58.1
+
+# Utilities
+python-dateutil==2.8.2
+pytz==2023.3
+requests==2.31.0
+click==8.1.7
+
+# Configuration and Secrets
+pydantic-settings==2.1.0
+python-dotenv==1.0.0
+
+# Logging and Monitoring
+loguru==0.7.2
+prometheus-client==0.19.0
+
+# Image Processing (for PDF/drawing analysis)
+opencv-python==4.8.1.78
+Pillow==10.1.0
+
+# Natural Language Processing
+nltk==3.8.1
+spacy==3.7.2
+transformers==4.35.2
+
+# Statistical Analysis
+scipy==1.11.4
+statsmodels==0.14.0
+
+# Optimization
+cvxpy==1.4.1
+pulp==2.7.0
+
+# Testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+factory-boy==3.3.0
+faker==20.1.0
+hypothesis==6.92.0
+
+# Development
+black==23.11.0
+isort==5.12.0
+flake8==6.1.0
+mypy==1.7.1
+pre-commit==3.6.0
+
+# Security
+cryptography==41.0.8
+bcrypt==4.1.2
+
+# API Documentation
+markdown==3.5.1
+
+# Caching
+cachetools==5.3.2
+
+# Progress bars
+tqdm==4.66.1
+
+# Configuration
+hydra-core==1.3.2
+omegaconf==2.3.0
