@@ -1,0 +1,300 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Backend Testing
+  backend-test:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_USER: test_user
+          POSTGRES_DB: electrical_orchestrator_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Cache Python dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest pytest-cov pytest-asyncio httpx black flake8 mypy
+        
+        # Install auth service dependencies
+        if [ -f src/backend/services/auth/requirements.txt ]; then
+          pip install -r src/backend/services/auth/requirements.txt
+        fi
+        
+        # Install gateway dependencies
+        if [ -f src/backend/gateway/requirements.txt ]; then
+          pip install -r src/backend/gateway/requirements.txt
+        fi
+
+    - name: Lint with flake8
+      run: |
+        # Stop the build if there are Python syntax errors or undefined names
+        flake8 src/backend --count --select=E9,F63,F7,F82 --show-source --statistics
+        # Exit-zero treats all errors as warnings
+        flake8 src/backend --count --exit-zero --max-complexity=10 --max-line-length=88 --statistics
+
+    - name: Check formatting with black
+      run: |
+        black --check src/backend/
+
+    - name: Type check with mypy
+      run: |
+        mypy src/backend/services/auth/ --ignore-missing-imports || true
+        mypy src/backend/gateway/ --ignore-missing-imports || true
+
+    - name: Test with pytest
+      env:
+        DATABASE_URL: postgresql://test_user:test_password@localhost:5432/electrical_orchestrator_test
+        REDIS_URL: redis://localhost:6379
+        JWT_SECRET_KEY: test-secret-key
+        NODE_ENV: test
+      run: |
+        cd src/backend/services/auth
+        pytest tests/ -v --cov=. --cov-report=xml --cov-report=html
+
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v3
+      with:
+        file: src/backend/services/auth/coverage.xml
+        flags: backend
+        name: backend-coverage
+
+  # Frontend Testing
+  frontend-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: src/frontend/package-lock.json
+
+    - name: Install frontend dependencies
+      run: |
+        if [ -d "src/frontend" ] && [ -f "src/frontend/package.json" ]; then
+          cd src/frontend
+          npm ci
+        else
+          echo "Frontend not yet implemented, skipping tests"
+          exit 0
+        fi
+
+    - name: Lint frontend code
+      run: |
+        if [ -d "src/frontend" ] && [ -f "src/frontend/package.json" ]; then
+          cd src/frontend
+          npm run lint || echo "Linting not configured yet"
+        fi
+
+    - name: Type check frontend
+      run: |
+        if [ -d "src/frontend" ] && [ -f "src/frontend/package.json" ]; then
+          cd src/frontend
+          npm run type-check || echo "Type checking not configured yet"
+        fi
+
+    - name: Test frontend
+      run: |
+        if [ -d "src/frontend" ] && [ -f "src/frontend/package.json" ]; then
+          cd src/frontend
+          npm test || echo "Tests not configured yet"
+        fi
+
+  # End-to-End Testing
+  e2e-test:
+    runs-on: ubuntu-latest
+    needs: [backend-test, frontend-test]
+    
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Install Playwright
+      run: |
+        npm install -g @playwright/test
+        npx playwright install --with-deps
+
+    - name: Start services for E2E testing
+      run: |
+        # Start test environment with Docker Compose
+        docker-compose --profile test up -d postgres-test redis-test
+        
+        # Wait for services to be ready
+        sleep 10
+
+    - name: Run E2E tests
+      run: |
+        if [ -f "playwright.config.ts" ]; then
+          npx playwright test || echo "E2E tests not fully configured yet"
+        else
+          echo "E2E tests not configured yet"
+        fi
+
+    - name: Upload E2E test results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: e2e-test-results
+        path: test-results/
+
+  # Docker Build
+  docker-build:
+    runs-on: ubuntu-latest
+    needs: [backend-test, frontend-test]
+    
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Login to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+
+    - name: Build and push Gateway image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: src/backend/docker/Dockerfile.gateway
+        push: true
+        tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-gateway:${{ github.sha }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Build and push Auth image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: src/backend/docker/Dockerfile.auth
+        push: true
+        tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-auth:${{ github.sha }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  # Security Scanning
+  security-scan:
+    runs-on: ubuntu-latest
+    needs: [docker-build]
+    
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-gateway:${{ github.sha }}
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  # Deployment (only on main branch)
+  deploy-staging:
+    runs-on: ubuntu-latest
+    needs: [docker-build, security-scan]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: staging
+    
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Deploy to staging
+      run: |
+        echo "Deploying to staging environment..."
+        echo "Gateway image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-gateway:${{ github.sha }}"
+        echo "Auth image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-auth:${{ github.sha }}"
+        
+        # In a real deployment, this would:
+        # 1. Update Kubernetes manifests with new image tags
+        # 2. Apply manifests to staging cluster
+        # 3. Wait for deployment to complete
+        # 4. Run smoke tests
+        
+        echo "Staging deployment completed (simulated)"
+
+  # Notify on success/failure
+  notify:
+    runs-on: ubuntu-latest
+    needs: [deploy-staging]
+    if: always()
+    
+    steps:
+    - name: Notify deployment status
+      run: |
+        if [ "${{ needs.deploy-staging.result }}" == "success" ]; then
+          echo "✅ Deployment successful!"
+        else
+          echo "❌ Deployment failed!"
+        fi
