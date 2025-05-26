@@ -1,0 +1,223 @@
+version: '3.8'
+
+services:
+  # Database services
+  postgres:
+    image: postgres:15-alpine
+    container_name: electrical-orchestrator-postgres
+    environment:
+      POSTGRES_DB: electrical_orchestrator
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-database.sql:/docker-entrypoint-initdb.d/init-database.sql
+    networks:
+      - electrical-orchestrator
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d electrical_orchestrator"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: electrical-orchestrator-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - electrical-orchestrator
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+
+  # Test database for isolated testing
+  postgres-test:
+    image: postgres:15-alpine
+    container_name: electrical-orchestrator-postgres-test
+    environment:
+      POSTGRES_DB: electrical_orchestrator_test
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_pass
+    ports:
+      - "5433:5432"
+    networks:
+      - electrical-orchestrator
+    profiles: ["test"]
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test_user -d electrical_orchestrator_test"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  redis-test:
+    image: redis:7-alpine
+    container_name: electrical-orchestrator-redis-test
+    ports:
+      - "6380:6379"
+    networks:
+      - electrical-orchestrator
+    profiles: ["test"]
+    tmpfs:
+      - /data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  # Backend services
+  gateway:
+    build:
+      context: .
+      dockerfile: src/backend/docker/Dockerfile.gateway
+    container_name: electrical-orchestrator-gateway
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:password@postgres:5432/electrical_orchestrator
+      - REDIS_URL=redis://redis:6379
+      - NODE_ENV=development
+      - LOG_LEVEL=info
+    volumes:
+      - ./src/backend:/app/backend
+      - ./src/backend/shared:/app/shared
+    networks:
+      - electrical-orchestrator
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    profiles: ["backend"]
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: src/backend/docker/Dockerfile.auth
+    container_name: electrical-orchestrator-auth
+    ports:
+      - "8001:8001"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:password@postgres:5432/electrical_orchestrator
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-development-secret-key}
+      - NODE_ENV=development
+    volumes:
+      - ./src/backend/services/auth:/app/auth
+      - ./src/backend/shared:/app/shared
+    networks:
+      - electrical-orchestrator
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    profiles: ["backend"]
+
+  # Frontend service
+  frontend:
+    build:
+      context: .
+      dockerfile: src/frontend/Dockerfile
+    container_name: electrical-orchestrator-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NODE_ENV=development
+    volumes:
+      - ./src/frontend:/app/frontend
+      - /app/frontend/node_modules  # Anonymous volume for node_modules
+      - /app/frontend/.next  # Anonymous volume for Next.js build cache
+    networks:
+      - electrical-orchestrator
+    depends_on:
+      - gateway
+    restart: unless-stopped
+    profiles: ["frontend"]
+
+  # Development tools
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: electrical-orchestrator-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@electrical-orchestrator.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - electrical-orchestrator
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    profiles: ["tools"]
+
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: electrical-orchestrator-redis-commander
+    environment:
+      REDIS_HOSTS: local:redis:6379
+    ports:
+      - "8081:8081"
+    networks:
+      - electrical-orchestrator
+    depends_on:
+      - redis
+    restart: unless-stopped
+    profiles: ["tools"]
+
+  # Local S3 simulation (MinIO)
+  minio:
+    image: minio/minio:latest
+    container_name: electrical-orchestrator-minio
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio_data:/data
+    networks:
+      - electrical-orchestrator
+    restart: unless-stopped
+    profiles: ["tools"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+networks:
+  electrical-orchestrator:
+    driver: bridge
+    name: electrical-orchestrator
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+  minio_data:
+    driver: local
