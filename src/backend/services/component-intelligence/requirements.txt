@@ -1,69 +1,65 @@
-# Enhanced Component Intelligence Service Requirements
+# Component Intelligence Service - MVP Requirements
+# Lightweight dependencies for MVP deployment
 
-# Core ML and Computer Vision
-tensorflow>=2.13.0
-opencv-python>=4.8.0
-scikit-image>=0.21.0
-numpy>=1.24.0
-
-# Feature Extraction and Analysis
-scikit-learn>=1.3.0
-scipy>=1.11.0
-
-# Database and Storage
-sqlite3  # Built-in with Python
-aiosqlite>=0.19.0
-redis>=5.0.0
-
-# Async Processing and HTTP
-asyncio  # Built-in with Python
-aiohttp>=3.8.0
-aiofiles>=23.2.0
-
-# Data Processing and Validation
-pandas>=2.0.0
-pydantic>=2.0.0
-pickle  # Built-in with Python
-json  # Built-in with Python
-
-# API and Web Services
+# === MVP CORE (Always Required) ===
 fastapi>=0.100.0
 uvicorn[standard]>=0.23.0
+pydantic>=2.0.0
 python-multipart>=0.0.6
-
-# Image Processing and OCR
-Pillow>=10.0.0
-imageio>=2.31.0
-pytesseract>=0.3.10  # For ISA symbol text recognition
-
-# Industrial Communications (Optional)
-# pymodbus>=3.5.0  # For Modbus protocol support
-# opcua>=0.98.0    # For OPC-UA protocol support
-
-# Security and Authentication
-python-jose[cryptography]>=3.3.0
 python-dotenv>=1.0.0
 
-# Logging and Utilities
-structlog>=23.2.0
-logging  # Built-in with Python
-hashlib  # Built-in with Python
-functools  # Built-in with Python
-datetime  # Built-in with Python
-enum  # Built-in with Python
-dataclasses  # Built-in with Python
-typing  # Built-in with Python
-concurrent.futures  # Built-in with Python
+# === PROFESSIONAL TIER (Advanced Features) ===
+# Uncomment when upgrading to Professional tier
 
-# Development and Testing
-pytest>=7.4.0
-pytest-asyncio>=0.21.0
-pytest-cov>=4.1.0
-httpx>=0.25.0  # For testing async HTTP clients
+# API Integration
+# aiohttp>=3.8.0
+# requests>=2.31.0
 
-# Optional GPU Acceleration
-# tensorflow-gpu>=2.13.0  # Uncomment if GPU support needed
+# Basic ML
+# numpy>=1.24.0
+# scikit-learn>=1.3.0
 
-# System Dependencies (install separately):
-# - tesseract-ocr (for OCR functionality)
-# - redis-server (for caching)
+# Database Enhancement
+# redis>=5.0.0
+
+# === ENTERPRISE TIER (Full Features) ===
+# Uncomment when upgrading to Enterprise tier
+
+# Advanced ML and Computer Vision
+# tensorflow>=2.13.0
+# opencv-python>=4.8.0
+# scipy>=1.11.0
+
+# Data Processing
+# pandas>=2.0.0
+# openpyxl>=3.1.0
+
+# Image Processing
+# Pillow>=10.0.0
+# scikit-image>=0.21.0
+
+# Scientific Computing
+# matplotlib>=3.8.0
+
+# === DEVELOPMENT DEPENDENCIES ===
+# For development and testing only
+
+# Testing
+# pytest>=7.4.0
+# pytest-asyncio>=0.21.0
+# pytest-cov>=4.1.0
+# httpx>=0.25.0
+
+# === INSTALLATION GUIDE ===
+# 
+# MVP Installation:
+# pip install fastapi uvicorn pydantic python-multipart python-dotenv
+#
+# Professional Upgrade:
+# pip install -r requirements-professional.txt
+# 
+# Enterprise Upgrade:
+# pip install -r requirements-enterprise.txt
+#
+# Development Setup:
+# pip install -r requirements-dev.txt

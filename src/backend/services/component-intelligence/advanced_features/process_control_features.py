@@ -535,10 +535,209 @@ class SpecificationValidator:
         
         return None
 
+class ProcessControlValidator:
+    """Specialized validator for process control and safety systems"""
+    
+    def __init__(self):
+        self.sil_requirements = self._load_sil_requirements()
+        self.iec_standards = self._load_iec_standards()
+        self.safety_functions = self._load_safety_functions()
+    
+    def _load_sil_requirements(self) -> Dict[str, Any]:
+        """Load SIL (Safety Integrity Level) requirements per IEC 61508"""
+        return {
+            "sil_1": {
+                "pfd_range": {"min": 1e-2, "max": 1e-1},
+                "description": "Low safety consequence",
+                "applications": ["Non-critical process control"]
+            },
+            "sil_2": {
+                "pfd_range": {"min": 1e-3, "max": 1e-2},
+                "description": "Moderate safety consequence",
+                "applications": ["Standard safety functions"]
+            },
+            "sil_3": {
+                "pfd_range": {"min": 1e-4, "max": 1e-3},
+                "description": "High safety consequence",
+                "applications": ["Critical safety systems"]
+            },
+            "sil_4": {
+                "pfd_range": {"min": 1e-5, "max": 1e-4},
+                "description": "Very high safety consequence",
+                "applications": ["Nuclear, aviation safety"]
+            }
+        }
+    
+    def _load_iec_standards(self) -> Dict[str, Any]:
+        """Load IEC standards for process control validation"""
+        return {
+            "iec_61508": {  # Functional Safety
+                "lifecycle_phases": [
+                    "concept", "scope_definition", "hazard_analysis",
+                    "requirements", "design", "implementation",
+                    "integration", "validation", "operation"
+                ],
+                "safety_functions": ["ESD", "Fire_Gas", "Process_Shutdown"]
+            },
+            "iec_61511": {  # Process Industry Safety
+                "sis_components": ["sensors", "logic_solver", "final_elements"],
+                "proof_test_intervals": {"sil_1": 12, "sil_2": 12, "sil_3": 6, "sil_4": 3}
+            },
+            "iec_62061": {  # Machinery Safety
+                "categories": ["B", "1", "2", "3", "4"],
+                "performance_levels": ["a", "b", "c", "d", "e"]
+            }
+        }
+    
+    def _load_safety_functions(self) -> Dict[str, Any]:
+        """Load common safety function definitions"""
+        return {
+            "emergency_shutdown": {
+                "acronym": "ESD",
+                "description": "Emergency shutdown system",
+                "typical_sil": "sil_2",
+                "response_time": "< 10 seconds",
+                "components": ["pressure_switches", "shutdown_valves", "logic_solver"]
+            },
+            "fire_gas_detection": {
+                "acronym": "FGS",
+                "description": "Fire and gas detection system",
+                "typical_sil": "sil_2",
+                "response_time": "< 30 seconds",
+                "components": ["gas_detectors", "flame_detectors", "alarm_panels"]
+            },
+            "high_integrity_pressure_protection": {
+                "acronym": "HIPPS",
+                "description": "High integrity pressure protection system",
+                "typical_sil": "sil_3",
+                "response_time": "< 2 seconds",
+                "components": ["pressure_transmitters", "safety_valves", "isolation_valves"]
+            },
+            "burner_management": {
+                "acronym": "BMS",
+                "description": "Burner management system",
+                "typical_sil": "sil_2",
+                "response_time": "< 5 seconds",
+                "components": ["flame_scanners", "gas_valves", "ignition_systems"]
+            }
+        }
+    
+    def validate_safety_system(self, spec: 'RealTimeSpecification') -> SpecificationValidation:
+        """Validate safety instrumented system components"""
+        validations = []
+        
+        # Check SIL rating compliance
+        sil_validation = self._validate_sil_compliance(spec)
+        if sil_validation:
+            validations.append(sil_validation)
+        
+        # Validate safety function requirements
+        function_validation = self._validate_safety_function(spec)
+        if function_validation:
+            validations.append(function_validation)
+        
+        # Check proof test requirements
+        proof_test_validation = self._validate_proof_test_requirements(spec)
+        if proof_test_validation:
+            validations.append(proof_test_validation)
+        
+        # Determine overall validation status
+        if any(v.status == ValidationStatus.ERROR for v in validations):
+            overall_status = ValidationStatus.ERROR
+            message = "Safety system validation errors found"
+        elif any(v.status == ValidationStatus.WARNING for v in validations):
+            overall_status = ValidationStatus.WARNING
+            message = "Safety system validation warnings"
+        else:
+            overall_status = ValidationStatus.VALID
+            message = "Safety system validation passed"
+        
+        return SpecificationValidation(
+            status=overall_status,
+            message=message,
+            details={"safety_validations": [v.__dict__ for v in validations]}
+        )
+    
+    def _validate_sil_compliance(self, spec: 'RealTimeSpecification') -> Optional[SpecificationValidation]:
+        """Validate SIL rating compliance"""
+        safety_data = spec.compliance_data.get("safety", {})
+        claimed_sil = safety_data.get("sil_rating")
+        
+        if claimed_sil and claimed_sil in self.sil_requirements:
+            # Check if component supports claimed SIL level
+            pfd_value = safety_data.get("pfd")  # Probability of Failure on Demand
+            
+            if pfd_value:
+                sil_req = self.sil_requirements[claimed_sil]
+                if not (sil_req["pfd_range"]["min"] <= pfd_value <= sil_req["pfd_range"]["max"]):
+                    return SpecificationValidation(
+                        status=ValidationStatus.ERROR,
+                        message=f"PFD value {pfd_value} not within {claimed_sil} range",
+                        code="SIL_PFD_MISMATCH"
+                    )
+        
+        return None
+    
+    def _validate_safety_function(self, spec: 'RealTimeSpecification') -> Optional[SpecificationValidation]:
+        """Validate against safety function requirements"""
+        safety_function = spec.compliance_data.get("safety", {}).get("safety_function")
+        
+        if safety_function and safety_function in self.safety_functions:
+            function_spec = self.safety_functions[safety_function]
+            
+            # Check response time requirements
+            response_time = spec.specifications.get("response_time")
+            if response_time:
+                required_time = function_spec.get("response_time", "").replace("< ", "").replace(" seconds", "")
+                try:
+                    required_time_float = float(required_time)
+                    if response_time > required_time_float:
+                        return SpecificationValidation(
+                            status=ValidationStatus.WARNING,
+                            message=f"Response time {response_time}s exceeds requirement for {safety_function}",
+                            code="RESPONSE_TIME_WARNING"
+                        )
+                except ValueError:
+                    pass
+        
+        return None
+    
+    def _validate_proof_test_requirements(self, spec: 'RealTimeSpecification') -> Optional[SpecificationValidation]:
+        """Validate proof test interval requirements"""
+        safety_data = spec.compliance_data.get("safety", {})
+        sil_rating = safety_data.get("sil_rating")
+        proof_test_interval = safety_data.get("proof_test_interval_months")
+        
+        if sil_rating and proof_test_interval:
+            iec_61511 = self.iec_standards["iec_61511"]
+            max_interval = iec_61511["proof_test_intervals"].get(sil_rating)
+            
+            if max_interval and proof_test_interval > max_interval:
+                return SpecificationValidation(
+                    status=ValidationStatus.WARNING,
+                    message=f"Proof test interval {proof_test_interval} months exceeds {sil_rating} requirement",
+                    code="PROOF_TEST_INTERVAL_WARNING"
+                )
+        
+        return None
+
+@dataclass
+class ProcessControlSpecification:
+    """Extended specification for process control devices"""
+    base_specification: RealTimeSpecification
+    process_parameters: Dict[str, Any] = field(default_factory=dict)
+    safety_functions: List[str] = field(default_factory=list)
+    sil_rating: Optional[str] = None
+    proof_test_interval: Optional[int] = None  # months
+    operating_conditions: Dict[str, Any] = field(default_factory=dict)
+    control_loop_tag: Optional[str] = None
+    instrument_tag: Optional[str] = None
+
 class RealTimeSpecificationIntelligence:
     def __init__(self, redis_host: str = "localhost", redis_port: int = 6379):
         self.manufacturer_client = ManufacturerAPIClient()
         self.validator = SpecificationValidator()
+        self.process_validator = ProcessControlValidator()
         self.cache = redis.Redis(host=redis_host, port=redis_port, decode_responses=True)
         self.executor = ThreadPoolExecutor(max_workers=4)
         
@@ -588,6 +787,23 @@ class RealTimeSpecificationIntelligence:
         # Validate specification
         validation = self.validator.validate_specification(real_time_spec)
         real_time_spec.validation = validation
+        
+        # Process control and safety validation if applicable
+        if self._is_process_control_device(category):
+            safety_validation = self.process_validator.validate_safety_system(real_time_spec)
+            if safety_validation.status != ValidationStatus.VALID:
+                # Merge safety validation with general validation
+                if validation.status == ValidationStatus.VALID:
+                    real_time_spec.validation = safety_validation
+                else:
+                    # Combine validations
+                    combined_details = validation.details.copy()
+                    combined_details.update(safety_validation.details)
+                    real_time_spec.validation = SpecificationValidation(
+                        status=ValidationStatus.ERROR if safety_validation.status == ValidationStatus.ERROR else validation.status,
+                        message=f"{validation.message}; {safety_validation.message}",
+                        details=combined_details
+                    )
         
         # Get availability and pricing data
         real_time_spec.availability = await self._get_availability_data(manufacturer, model_number)
@@ -729,6 +945,87 @@ class RealTimeSpecificationIntelligence:
         
         return alternatives.get(category, [])
     
+    def _is_process_control_device(self, category: str) -> bool:
+        """Check if device category requires process control validation"""
+        process_categories = [
+            "pressure_transmitter", "temperature_transmitter", "flow_transmitter",
+            "level_transmitter", "ph_transmitter", "conductivity_transmitter",
+            "safety_valve", "control_valve", "shutdown_valve",
+            "gas_detector", "flame_detector", "smoke_detector",
+            "safety_plc", "safety_relay", "emergency_stop",
+            "pressure_switch", "temperature_switch", "level_switch"
+        ]
+        return category.lower() in process_categories
+    
+    async def get_process_control_specification(self,
+                                              manufacturer: str,
+                                              model_number: str,
+                                              component_id: str,
+                                              category: str,
+                                              process_parameters: Optional[Dict[str, Any]] = None) -> ProcessControlSpecification:
+        """Get enhanced specification for process control devices"""
+        
+        # Get base specification
+        base_spec = await self.get_real_time_specification(
+            manufacturer, model_number, component_id, category
+        )
+        
+        # Enhance with process control data
+        process_spec = ProcessControlSpecification(
+            base_specification=base_spec,
+            process_parameters=process_parameters or {},
+        )
+        
+        # Extract process-specific information
+        await self._enhance_process_specification(process_spec)
+        
+        return process_spec
+    
+    async def _enhance_process_specification(self, process_spec: ProcessControlSpecification):
+        """Enhance specification with process control specific data"""
+        base_spec = process_spec.base_specification
+        
+        # Extract SIL rating from compliance data
+        safety_data = base_spec.compliance_data.get("safety", {})
+        process_spec.sil_rating = safety_data.get("sil_rating")
+        process_spec.proof_test_interval = safety_data.get("proof_test_interval_months")
+        
+        # Extract process parameters
+        specs = base_spec.specifications
+        process_spec.process_parameters.update({
+            "measurement_range": {
+                "min": specs.get("measurement_range_min"),
+                "max": specs.get("measurement_range_max"),
+                "units": specs.get("measurement_units")
+            },
+            "accuracy": specs.get("accuracy"),
+            "repeatability": specs.get("repeatability"),
+            "response_time": specs.get("response_time"),
+            "operating_temperature": {
+                "min": specs.get("operating_temp_min"),
+                "max": specs.get("operating_temp_max")
+            },
+            "operating_pressure": {
+                "min": specs.get("operating_pressure_min"),
+                "max": specs.get("operating_pressure_max")
+            }
+        })
+        
+        # Extract tag information if available
+        process_spec.instrument_tag = specs.get("instrument_tag")
+        process_spec.control_loop_tag = specs.get("control_loop_tag")
+        
+        # Identify safety functions
+        safety_functions = []
+        if "emergency_shutdown" in str(specs).lower():
+            safety_functions.append("emergency_shutdown")
+        if "fire" in str(specs).lower() or "gas" in str(specs).lower():
+            safety_functions.append("fire_gas_detection")
+        if "pressure_protection" in str(specs).lower():
+            safety_functions.append("high_integrity_pressure_protection")
+        
+        process_spec.safety_functions = safety_functions
+    
     def create_specification_overlay(self, 
                                    spec: RealTimeSpecification,
                                    config: OverlayConfiguration) -> Dict[str, Any]:
@@ -788,7 +1085,7 @@ async def test_specification_intelligence():
     await intelligence.initialize()
     
     try:
-        # Test specification lookup
+        # Test standard specification lookup
         spec = await intelligence.get_real_time_specification(
             manufacturer="Square D",
             model_number="QO120",
@@ -796,11 +1093,31 @@ async def test_specification_intelligence():
             category="breaker"
         )
         
-        print(f"Specification Retrieved:")
+        print(f"Standard Specification Retrieved:")
         print(f"Manufacturer: {spec.manufacturer}")
         print(f"Model: {spec.model_number}")
         print(f"Source: {spec.source.value}")
         print(f"Validation: {spec.validation.status.value if spec.validation else 'None'}")
+        
+        # Test process control specification
+        process_spec = await intelligence.get_process_control_specification(
+            manufacturer="Rosemount",
+            model_number="3051S",
+            component_id="PT-001",
+            category="pressure_transmitter",
+            process_parameters={
+                "process_fluid": "Natural Gas",
+                "operating_temperature": {"min": -40, "max": 85},
+                "hazardous_area": "Class I, Div 1"
+            }
+        )
+        
+        print(f"\nProcess Control Specification Retrieved:")
+        print(f"Base Manufacturer: {process_spec.base_specification.manufacturer}")
+        print(f"SIL Rating: {process_spec.sil_rating}")
+        print(f"Safety Functions: {process_spec.safety_functions}")
+        print(f"Instrument Tag: {process_spec.instrument_tag}")
+        print(f"Process Parameters: {json.dumps(process_spec.process_parameters, indent=2)}")
         
         # Test overlay creation
         config = OverlayConfiguration(
@@ -812,8 +1129,66 @@ async def test_specification_intelligence():
         overlay = intelligence.create_specification_overlay(spec, config)
         print(f"\nOverlay Data: {json.dumps(overlay, indent=2)}")
         
+        # Test safety system validation
+        safety_spec = RealTimeSpecification(
+            component_id="safety_valve_001",
+            manufacturer="Emerson",
+            model_number="8D Series",
+            category="safety_valve",
+            specifications={
+                "response_time": 8.0,  # seconds
+                "measurement_range_min": 0,
+                "measurement_range_max": 1000,
+                "measurement_units": "psi"
+            },
+            source=SpecificationSource.MANUFACTURER_API,
+            last_updated=datetime.now(),
+            compliance_data={
+                "safety": {
+                    "sil_rating": "sil_2",
+                    "pfd": 5e-3,
+                    "safety_function": "emergency_shutdown",
+                    "proof_test_interval_months": 12
+                }
+            }
+        )
+        
+        safety_validation = intelligence.process_validator.validate_safety_system(safety_spec)
+        print(f"\nSafety System Validation:")
+        print(f"Status: {safety_validation.status.value}")
+        print(f"Message: {safety_validation.message}")
+        
     finally:
         await intelligence.close()
+
+async def test_process_control_validation():
+    """Test process control and safety systems validation"""
+    validator = ProcessControlValidator()
+    
+    # Test SIL compliance validation
+    test_spec = RealTimeSpecification(
+        component_id="test_transmitter",
+        manufacturer="Test Manufacturer",
+        model_number="TEST-001",
+        category="pressure_transmitter",
+        specifications={"response_time": 1.0},
+        source=SpecificationSource.LOCAL_DATABASE,
+        last_updated=datetime.now(),
+        compliance_data={
+            "safety": {
+                "sil_rating": "sil_3",
+                "pfd": 5e-4,  # Within SIL 3 range
+                "safety_function": "high_integrity_pressure_protection"
+            }
+        }
+    )
+    
+    validation_result = validator.validate_safety_system(test_spec)
+    print(f"Process Control Validation Test:")
+    print(f"Status: {validation_result.status.value}")
+    print(f"Message: {validation_result.message}")
+    
+    return validation_result.status == ValidationStatus.VALID
 
 if __name__ == "__main__":
     asyncio.run(test_specification_intelligence())
