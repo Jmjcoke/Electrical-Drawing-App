@@ -1,0 +1,101 @@
+# Docker Compose for PDF Processing Service Development
+# Includes LocalStack for S3 simulation and Redis for background tasks
+
+version: '3.8'
+
+services:
+  pdf-processing:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8003:8003"
+    environment:
+      # Database
+      DATABASE_URL: "postgresql+asyncpg://postgres:password@postgres:5432/electrical_orchestrator"
+      
+      # AWS S3 Configuration (LocalStack for development)
+      AWS_ACCESS_KEY_ID: "test"
+      AWS_SECRET_ACCESS_KEY: "test"
+      AWS_DEFAULT_REGION: "us-east-1"
+      S3_BUCKET: "electrical-orchestrator-drawings"
+      S3_REGION: "us-east-1"
+      S3_ENDPOINT_URL: "http://localstack:4566"  # LocalStack endpoint
+      
+      # Security
+      VIRUS_SCAN_ENABLED: "false"  # Disable for development
+      
+      # Redis for background tasks
+      REDIS_URL: "redis://redis:6379/0"
+      
+      # Logging
+      LOG_LEVEL: "INFO"
+      
+    depends_on:
+      - postgres
+      - redis
+      - localstack
+    volumes:
+      - ./:/app
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8003", "--reload"]
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: electrical_orchestrator
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  localstack:
+    image: localstack/localstack:2.3
+    ports:
+      - "4566:4566"  # LocalStack edge port
+    environment:
+      SERVICES: "s3"
+      DEBUG: 1
+      DATA_DIR: "/tmp/localstack/data"
+      DOCKER_HOST: "unix:///var/run/docker.sock"
+    volumes:
+      - "/tmp/localstack:/tmp/localstack"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+
+  # S3 bucket initialization
+  s3-init:
+    image: amazon/aws-cli:latest
+    depends_on:
+      - localstack
+    environment:
+      AWS_ACCESS_KEY_ID: "test"
+      AWS_SECRET_ACCESS_KEY: "test"
+      AWS_DEFAULT_REGION: "us-east-1"
+    entrypoint: /bin/sh
+    command: >
+      -c "
+      # Wait for LocalStack to be ready
+      sleep 10
+      
+      # Create S3 bucket
+      aws --endpoint-url=http://localstack:4566 s3 mb s3://electrical-orchestrator-drawings
+      
+      # Set bucket policy for development
+      aws --endpoint-url=http://localstack:4566 s3api put-bucket-versioning \
+        --bucket electrical-orchestrator-drawings \
+        --versioning-configuration Status=Enabled
+      
+      echo 'S3 bucket initialized successfully'
+      "
+
+volumes:
+  postgres_data:
+  redis_data:

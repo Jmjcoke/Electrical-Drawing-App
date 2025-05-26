@@ -33,10 +33,12 @@ logger = logging.getLogger(__name__)
 # Service URLs
 SERVICE_URLS = {
     "auth": os.getenv("AUTH_SERVICE_URL", "http://auth-service:8001"),
-    "pdf": os.getenv("PDF_SERVICE_URL", "http://pdf-service:8002"),
-    "ai": os.getenv("AI_SERVICE_URL", "http://ai-service:8003"),
-    "estimation": os.getenv("ESTIMATION_SERVICE_URL", "http://estimation-service:8004"),
-    "tracking": os.getenv("TRACKING_SERVICE_URL", "http://tracking-service:8005"),
+    "projects": os.getenv("PROJECTS_SERVICE_URL", "http://projects-service:8002"),
+    "pdf": os.getenv("PDF_SERVICE_URL", "http://pdf-service:8003"),
+    "ai": os.getenv("AI_SERVICE_URL", "http://ai-service:8004"),
+    "ai_vision": os.getenv("AI_VISION_SERVICE_URL", "http://ai-vision-service:8004"),
+    "estimation": os.getenv("ESTIMATION_SERVICE_URL", "http://estimation-service:8005"),
+    "tracking": os.getenv("TRACKING_SERVICE_URL", "http://tracking-service:8006"),
 }
 
 @asynccontextmanager
@@ -254,23 +256,206 @@ async def logout(request: Request):
     headers = {"Authorization": request.headers.get("Authorization", "")}
     return await proxy_to_service("auth", "/auth/logout", "POST", headers=headers)
 
-# Project management routes (placeholder for future implementation)
+# Project management routes
 @app.get("/api/v1/projects")
-async def list_projects():
-    """List projects (placeholder)"""
-    return {"projects": [], "message": "Project service not yet implemented"}
+async def list_projects(request: Request):
+    """List projects with filtering and pagination"""
+    headers = {"Authorization": request.headers.get("Authorization", "")}
+    params = dict(request.query_params)
+    return await proxy_to_service("projects", "/projects", "GET", headers=headers, params=params)
 
 @app.post("/api/v1/projects")
 async def create_project(request: Request):
-    """Create project (placeholder)"""
-    return {"message": "Project creation not yet implemented"}
+    """Create new project"""
+    body = await request.json()
+    headers = {"Authorization": request.headers.get("Authorization", "")}
+    return await proxy_to_service("projects", "/projects", "POST", body, headers)
 
-# PDF processing routes (placeholder for future implementation)  
+@app.get("/api/v1/projects/{project_id}")
+async def get_project(project_id: str, request: Request):
+    """Get project by ID"""
+    headers = {"Authorization": request.headers.get("Authorization", "")}
+    return await proxy_to_service("projects", f"/projects/{project_id}", "GET", headers=headers)
+
+@app.put("/api/v1/projects/{project_id}")
+async def update_project(project_id: str, request: Request):
+    """Update project"""
+    body = await request.json()
+    headers = {"Authorization": request.headers.get("Authorization", "")}
+    return await proxy_to_service("projects", f"/projects/{project_id}", "PUT", body, headers)
+
+@app.delete("/api/v1/projects/{project_id}")
+async def archive_project(project_id: str, request: Request):
+    """Archive project"""
+    headers = {"Authorization": request.headers.get("Authorization", "")}
+    return await proxy_to_service("projects", f"/projects/{project_id}", "DELETE", headers=headers)
+
+# Team management routes
+@app.get("/api/v1/projects/{project_id}/team")
+async def get_project_team(project_id: str, request: Request):
+    """Get project team members"""
+    headers = {"Authorization": request.headers.get("Authorization", "")}
+    return await proxy_to_service("projects", f"/projects/{project_id}/team", "GET", headers=headers)
+
+@app.post("/api/v1/projects/{project_id}/team")
+async def add_team_member(project_id: str, request: Request):
+    """Add team member to project"""
+    body = await request.json()
+    headers = {"Authorization": request.headers.get("Authorization", "")}
+    return await proxy_to_service("projects", f"/projects/{project_id}/team", "POST", body, headers)
+
+# PDF processing routes
 @app.post("/api/v1/pdf/upload")
-async def upload_pdf():
-    """Upload PDF (placeholder)"""
-    return {"message": "PDF processing service not yet implemented"}
+async def upload_pdf(request: Request):
+    """Upload PDF drawing for processing"""
+    # Handle multipart form data differently
+    headers = {"Authorization": request.headers.get("Authorization", "")}
+    
+    # For file uploads, we need to stream the request body
+    try:
+        # Get the raw request body and headers for file upload
+        body = await request.body()
+        content_type = request.headers.get("content-type", "")
+        
+        if content_type:
+            headers["content-type"] = content_type
+        
+        # Stream upload to PDF service
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{SERVICE_URLS['pdf']}/upload",
+                content=body,
+                headers=headers,
+                timeout=60.0  # Longer timeout for file uploads
+            )
+            
+            return JSONResponse(
+                content=response.json() if response.content else {},
+                status_code=response.status_code
+            )
+            
+    except Exception as e:
+        logger.error(f"PDF upload error: {e}")
+        raise HTTPException(status_code=500, detail="Upload failed")
 
+@app.get("/api/v1/pdf/drawings/{drawing_id}/status")
+async def get_drawing_status(drawing_id: str, request: Request):
+    """Get PDF processing status"""
+    headers = {"Authorization": request.headers.get("Authorization", "")}
+    return await proxy_to_service("pdf", f"/drawings/{drawing_id}/status", "GET", headers=headers)
+
+@app.get("/api/v1/projects/{project_id}/drawings")
+async def list_project_drawings(project_id: str, request: Request):
+    """List drawings for a project"""
+    headers = {"Authorization": request.headers.get("Authorization", "")}
+    return await proxy_to_service("pdf", f"/projects/{project_id}/drawings", "GET", headers=headers)
+
+@app.delete("/api/v1/pdf/drawings/{drawing_id}")
+async def delete_drawing(drawing_id: str, request: Request):
+    """Delete a drawing"""
+    headers = {"Authorization": request.headers.get("Authorization", "")}
+    return await proxy_to_service("pdf", f"/drawings/{drawing_id}", "DELETE", headers=headers)
+
+@app.get("/api/v1/pdf/drawings/{drawing_id}/thumbnails")
+async def get_drawing_thumbnails(drawing_id: str, request: Request):
+    """Get all thumbnails for a drawing"""
+    headers = {"Authorization": request.headers.get("Authorization", "")}
+    return await proxy_to_service("pdf", f"/drawings/{drawing_id}/thumbnails", "GET", headers=headers)
+
+@app.get("/api/v1/pdf/drawings/{drawing_id}/pages")
+async def get_drawing_pages(drawing_id: str, request: Request):
+    """Get page information and navigation data"""
+    headers = {"Authorization": request.headers.get("Authorization", "")}
+    return await proxy_to_service("pdf", f"/drawings/{drawing_id}/pages", "GET", headers=headers)
+
+@app.get("/api/v1/pdf/drawings/{drawing_id}/pages/{page_number}/thumbnail")
+async def get_page_thumbnail(drawing_id: str, page_number: int, request: Request):
+    """Get a specific page thumbnail"""
+    headers = {"Authorization": request.headers.get("Authorization", "")}
+    params = dict(request.query_params)  # Include size parameter
+    return await proxy_to_service("pdf", f"/drawings/{drawing_id}/pages/{page_number}/thumbnail", "GET", headers=headers, params=params)
+
+# AI Vision / Cloud Detection routes
+@app.post("/api/v1/ai/detect-clouds")
+async def detect_clouds(request: Request):
+    """Detect cloud areas in electrical drawings"""
+    body = await request.json()
+    headers = {"Authorization": request.headers.get("Authorization", "")}
+    return await proxy_to_service("ai_vision", "/detect-clouds", "POST", body, headers)
+
+@app.get("/api/v1/ai/detection-status/{task_id}")
+async def get_detection_status(task_id: str, request: Request):
+    """Get cloud detection task status"""
+    headers = {"Authorization": request.headers.get("Authorization", "")}
+    return await proxy_to_service("ai_vision", f"/detection-status/{task_id}", "GET", headers=headers)
+
+@app.get("/api/v1/ai/drawings/{drawing_id}/clouds")
+async def get_cloud_detection_results(drawing_id: str, request: Request):
+    """Get cloud detection results for a drawing"""
+    headers = {"Authorization": request.headers.get("Authorization", "")}
+    return await proxy_to_service("ai_vision", f"/drawings/{drawing_id}/clouds", "GET", headers=headers)
+
+@app.post("/api/v1/ai/save-cloud-edits")
+async def save_cloud_edits(request: Request):
+    """Save manual cloud area edits"""
+    body = await request.json()
+    headers = {"Authorization": request.headers.get("Authorization", "")}
+    return await proxy_to_service("ai_vision", "/save-cloud-edits", "POST", body, headers)
+
+@app.post("/api/v1/ai/generate-enhanced-overlay")
+async def generate_enhanced_overlay(request: Request):
+    """Generate enhanced overlay with cloud detection results"""
+    body = await request.body()
+    headers = {"Authorization": request.headers.get("Authorization", "")}
+    headers["Content-Type"] = request.headers.get("Content-Type", "application/x-www-form-urlencoded")
+    return await proxy_to_service("ai_vision", "/generate-enhanced-overlay", "POST", body, headers)
+
+@app.post("/api/v1/ai/update-detection-settings")
+async def update_detection_settings(request: Request):
+    """Update cloud detection configuration settings"""
+    body = await request.json()
+    headers = {"Authorization": request.headers.get("Authorization", "")}
+    return await proxy_to_service("ai_vision", "/update-detection-settings", "POST", body, headers)
+
+@app.get("/api/v1/drawings/{drawing_id}/clouds")
+async def get_drawing_cloud_results(drawing_id: str, request: Request):
+    """Get cloud detection results from PDF processing service"""
+    headers = {"Authorization": request.headers.get("Authorization", "")}
+    return await proxy_to_service("pdf", f"/drawings/{drawing_id}/clouds", "GET", headers=headers)
+
+# Detection Profile Management routes
+@app.get("/api/v1/ai/detection-profiles")
+async def get_detection_profiles(request: Request):
+    """Get all available detection profiles"""
+    headers = {"Authorization": request.headers.get("Authorization", "")}
+    return await proxy_to_service("ai_vision", "/detection-profiles", "GET", headers=headers)
+
+@app.post("/api/v1/ai/detection-profiles")
+async def create_detection_profile(request: Request):
+    """Create a new detection profile"""
+    body = await request.json()
+    headers = {"Authorization": request.headers.get("Authorization", "")}
+    return await proxy_to_service("ai_vision", "/detection-profiles", "POST", body, headers)
+
+@app.put("/api/v1/ai/detection-profiles/{profile_id}")
+async def update_detection_profile(profile_id: str, request: Request):
+    """Update an existing detection profile"""
+    body = await request.json()
+    headers = {"Authorization": request.headers.get("Authorization", "")}
+    return await proxy_to_service("ai_vision", f"/detection-profiles/{profile_id}", "PUT", body, headers)
+
+@app.delete("/api/v1/ai/detection-profiles/{profile_id}")
+async def delete_detection_profile(profile_id: str, request: Request):
+    """Delete a detection profile"""
+    headers = {"Authorization": request.headers.get("Authorization", "")}
+    return await proxy_to_service("ai_vision", f"/detection-profiles/{profile_id}", "DELETE", headers=headers)
+
+@app.post("/api/v1/ai/detection-profiles/{profile_id}/apply")
+async def apply_detection_profile(profile_id: str, request: Request):
+    """Apply a detection profile to a specific drawing"""
+    body = await request.json()
+    headers = {"Authorization": request.headers.get("Authorization", "")}
+    return await proxy_to_service("ai_vision", f"/detection-profiles/{profile_id}/apply", "POST", body, headers)
 # Circuit analysis routes (placeholder for future implementation)
 @app.post("/api/v1/circuits/trace")
 async def trace_circuit():

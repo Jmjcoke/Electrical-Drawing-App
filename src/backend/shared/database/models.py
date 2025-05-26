@@ -33,6 +33,31 @@ class ProjectStatus(str, enum.Enum):
     COMPLETED = "completed"
     ARCHIVED = "archived"
 
+class ProjectPriority(str, enum.Enum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
+
+class ProjectType(str, enum.Enum):
+    BROWNFIELD = "brownfield"
+    GREENFIELD = "greenfield"
+    MAINTENANCE = "maintenance"
+    UPGRADE = "upgrade"
+
+class IndustrySector(str, enum.Enum):
+    OIL_GAS = "oil_gas"
+    MINING = "mining"
+    INDUSTRIAL = "industrial"
+    RENEWABLE = "renewable"
+
+class FacilityType(str, enum.Enum):
+    REFINERY = "refinery"
+    PLATFORM = "platform"
+    PLANT = "plant"
+    TERMINAL = "terminal"
+    WELLHEAD = "wellhead"
+
 class DrawingStatus(str, enum.Enum):
     UPLOADED = "uploaded"
     PROCESSING = "processing"
@@ -109,6 +134,31 @@ class Project(BaseModel):
     estimated_hours: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     actual_hours: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     
+    # Enhanced project metadata
+    project_type: Mapped[Optional[ProjectType]] = mapped_column(
+        Enum(ProjectType), 
+        nullable=True,
+        default=ProjectType.BROWNFIELD
+    )
+    industry_sector: Mapped[Optional[IndustrySector]] = mapped_column(
+        Enum(IndustrySector),
+        nullable=True,
+        default=IndustrySector.OIL_GAS
+    )
+    facility_type: Mapped[Optional[FacilityType]] = mapped_column(
+        Enum(FacilityType),
+        nullable=True
+    )
+    project_priority: Mapped[ProjectPriority] = mapped_column(
+        Enum(ProjectPriority),
+        nullable=False,
+        default=ProjectPriority.MEDIUM
+    )
+    contract_number: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    estimated_manhours: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    actual_manhours: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    project_manager_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    
     # Foreign keys
     created_by: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), 
@@ -130,6 +180,15 @@ class Project(BaseModel):
     drawings: Mapped[List["Drawing"]] = relationship(
         "Drawing", 
         back_populates="project",
+        cascade="all, delete-orphan"
+    )
+    settings: Mapped[Optional["ProjectSettings"]] = relationship(
+        "ProjectSettings",
+        uselist=False,
+        cascade="all, delete-orphan"
+    )
+    milestones: Mapped[List["ProjectMilestone"]] = relationship(
+        "ProjectMilestone",
         cascade="all, delete-orphan"
     )
 
@@ -157,6 +216,58 @@ class ProjectTeamMember(BaseModel):
     # Relationships
     project: Mapped[Project] = relationship("Project", back_populates="team_members")
     user: Mapped[User] = relationship("User", back_populates="assigned_projects")
+
+# Project settings and configuration
+class ProjectSettings(BaseModel):
+    __tablename__ = "project_settings"
+    
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), 
+        ForeignKey("projects.id"), 
+        nullable=False,
+        unique=True
+    )
+    
+    # Drawing processing settings
+    drawing_auto_processing: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    cloud_detection_sensitivity: Mapped[float] = mapped_column(Float, default=0.7, nullable=False)
+    estimation_method: Mapped[str] = mapped_column(String(50), default="ml_model", nullable=False)
+    
+    # Notification preferences
+    email_notifications: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    notification_preferences: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    
+    # Custom fields and configurations
+    custom_fields: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    workflow_settings: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    
+    # Relationships
+    project: Mapped[Project] = relationship("Project")
+
+# Project milestones and timeline tracking
+class ProjectMilestone(BaseModel):
+    __tablename__ = "project_milestones"
+    
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), 
+        ForeignKey("projects.id"), 
+        nullable=False
+    )
+    
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    target_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    actual_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    is_completed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    completion_percentage: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    
+    # Milestone metadata
+    milestone_type: Mapped[str] = mapped_column(String(50), nullable=True)  # "design", "installation", "testing"
+    dependencies: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    
+    # Relationships
+    project: Mapped[Project] = relationship("Project")
 
 # Drawing and PDF processing models
 class Drawing(BaseModel):
