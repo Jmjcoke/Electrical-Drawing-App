@@ -1,4 +1,4 @@
-# Enhanced Component Recognition Service Requirements
+# Enhanced Component Intelligence Service Requirements
 
 # Core ML and Computer Vision
 tensorflow>=2.13.0
@@ -13,34 +13,57 @@ scipy>=1.11.0
 # Database and Storage
 sqlite3  # Built-in with Python
 aiosqlite>=0.19.0
+redis>=5.0.0
 
-# Async Processing
+# Async Processing and HTTP
 asyncio  # Built-in with Python
 aiohttp>=3.8.0
+aiofiles>=23.2.0
 
-# Data Processing
+# Data Processing and Validation
 pandas>=2.0.0
+pydantic>=2.0.0
 pickle  # Built-in with Python
 json  # Built-in with Python
 
+# API and Web Services
+fastapi>=0.100.0
+uvicorn[standard]>=0.23.0
+python-multipart>=0.0.6
+
+# Image Processing and OCR
+Pillow>=10.0.0
+imageio>=2.31.0
+pytesseract>=0.3.10  # For ISA symbol text recognition
+
+# Industrial Communications (Optional)
+# pymodbus>=3.5.0  # For Modbus protocol support
+# opcua>=0.98.0    # For OPC-UA protocol support
+
+# Security and Authentication
+python-jose[cryptography]>=3.3.0
+python-dotenv>=1.0.0
+
 # Logging and Utilities
+structlog>=23.2.0
 logging  # Built-in with Python
 hashlib  # Built-in with Python
 functools  # Built-in with Python
-
-# API and Web Services
-fastapi>=0.100.0
-uvicorn>=0.23.0
-pydantic>=2.0.0
-
-# Image Processing Enhancements
-Pillow>=10.0.0
-imageio>=2.31.0
-
-# Optional GPU Acceleration
-# tensorflow-gpu>=2.13.0  # Uncomment if GPU support needed
+datetime  # Built-in with Python
+enum  # Built-in with Python
+dataclasses  # Built-in with Python
+typing  # Built-in with Python
+concurrent.futures  # Built-in with Python
 
 # Development and Testing
 pytest>=7.4.0
 pytest-asyncio>=0.21.0
 pytest-cov>=4.1.0
+httpx>=0.25.0  # For testing async HTTP clients
+
+# Optional GPU Acceleration
+# tensorflow-gpu>=2.13.0  # Uncomment if GPU support needed
+
+# System Dependencies (install separately):
+# - tesseract-ocr (for OCR functionality)
+# - redis-server (for caching)
