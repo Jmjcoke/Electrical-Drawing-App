@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # ELECTRICAL ORCHESTRATOR
 
 > AI-powered brownfield electrical estimation platform for oil & gas professionals
