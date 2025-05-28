@@ -191,6 +191,21 @@ async def health_check():
         "timestamp": time.time()
     }
 
+@app.get("/api/v1/system/status")
+async def system_status():
+    """Get system status for all services"""
+    database_health = await check_database_health()
+    redis_health = await check_redis_health()
+    
+    return {
+        "postgres": database_health,
+        "redis": redis_health,
+        "gateway": {
+            "status": "healthy",
+            "service": "gateway"
+        }
+    }
+
 @app.get("/health/detailed")
 async def detailed_health_check():
     """Detailed health check including dependencies"""

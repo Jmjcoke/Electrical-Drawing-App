@@ -109,3 +109,53 @@ export function formatFileSize(bytes: number): string {
 
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
+
+/**
+ * Format confidence score as percentage
+ */
+export function formatConfidence(confidence: number): string {
+  return `${Math.round(confidence * 100)}%`;
+}
+
+/**
+ * Get confidence color based on threshold
+ */
+export function getConfidenceColor(confidence: number): string {
+  if (confidence > 0.85) return 'text-green-600';
+  if (confidence >= 0.70) return 'text-yellow-600';
+  return 'text-red-600';
+}
+
+/**
+ * Calculate distance between two points
+ */
+export function calculateDistance(
+  point1: { x: number; y: number },
+  point2: { x: number; y: number }
+): number {
+  const dx = point2.x - point1.x;
+  const dy = point2.y - point1.y;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+/**
+ * Check if point is inside bounding box
+ */
+export function isPointInBoundingBox(
+  point: { x: number; y: number },
+  boundingBox: { x: number; y: number; width: number; height: number }
+): boolean {
+  return (
+    point.x >= boundingBox.x &&
+    point.x <= boundingBox.x + boundingBox.width &&
+    point.y >= boundingBox.y &&
+    point.y <= boundingBox.y + boundingBox.height
+  );
+}
+
+/**
+ * Clamp number between min and max
+ */
+export function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}

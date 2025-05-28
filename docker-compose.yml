@@ -92,7 +92,7 @@ services:
       - NODE_ENV=development
       - LOG_LEVEL=info
     volumes:
-      - ./src/backend:/app/backend
+      - ./src/backend/gateway:/app/gateway
       - ./src/backend/shared:/app/shared
     networks:
       - electrical-orchestrator
@@ -132,8 +132,8 @@ services:
   # Frontend service
   frontend:
     build:
-      context: .
-      dockerfile: src/frontend/Dockerfile
+      context: ./src/frontend
+      dockerfile: Dockerfile.dev
     container_name: electrical-orchestrator-frontend
     ports:
       - "3000:3000"
@@ -141,9 +141,9 @@ services:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
       - NODE_ENV=development
     volumes:
-      - ./src/frontend:/app/frontend
-      - /app/frontend/node_modules  # Anonymous volume for node_modules
-      - /app/frontend/.next  # Anonymous volume for Next.js build cache
+      - ./src/frontend:/app
+      - /app/node_modules
+      - /app/.next
     networks:
       - electrical-orchestrator
     depends_on:

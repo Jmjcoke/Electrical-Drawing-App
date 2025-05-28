@@ -4,6 +4,7 @@ import { cn } from '../../lib/utils';
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
   size?: 'default' | 'sm' | 'lg' | 'icon';
+  as?: 'button' | 'span' | 'div';
   children: React.ReactNode;
 }
 
@@ -11,6 +12,7 @@ export const Button: React.FC<ButtonProps> = ({
   className,
   variant = 'default',
   size = 'default',
+  as = 'button',
   children,
   ...props
 }) => {
@@ -32,8 +34,10 @@ export const Button: React.FC<ButtonProps> = ({
     icon: 'h-10 w-10'
   };
 
+  const Component = as;
+  
   return (
-    <button
+    <Component
       className={cn(
         baseStyles,
         variants[variant],
@@ -43,6 +47,6 @@ export const Button: React.FC<ButtonProps> = ({
       {...props}
     >
       {children}
-    </button>
+    </Component>
   );
 };

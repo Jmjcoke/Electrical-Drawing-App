@@ -89,8 +89,9 @@ async def check_database_health() -> dict:
     try:
         async with AsyncSessionLocal() as session:
             # Simple query to test connection
-            result = await session.execute("SELECT 1")
-            await result.fetchone()
+            from sqlalchemy import text
+            result = await session.execute(text("SELECT 1"))
+            result.fetchone()
             
             # Get some basic stats
             pool = engine.pool
@@ -146,9 +147,6 @@ async def check_redis_health() -> dict:
 async def init_database():
     """Initialize database tables"""
     async with engine.begin() as conn:
-        # Import all models to ensure they're registered
-        from .models import *  # noqa: F401, F403
-        
         # Create all tables
         await conn.run_sync(Base.metadata.create_all)
         logger.info("Database tables created/verified")
@@ -157,3 +155,12 @@ async def close_database():
     """Close database connections"""
     await engine.dispose()
     logger.info("Database connections closed")
+
+# Dependency injection for database sessions
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    """Provide database session for request"""
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+        finally:
+            await session.close()

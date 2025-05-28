@@ -27,9 +27,10 @@ import PyPDF2
 import fitz  # PyMuPDF for better PDF processing
 import hashlib
 import magic  # python-magic for file type detection
-from .pdf_analyzer import PDFAnalyzer
-from .thumbnail_generator import ThumbnailGenerator
-from .cloud_integration import perform_cloud_detection, generate_cloud_overlay_thumbnails, should_perform_cloud_detection, enhance_detection_results_with_metadata
+# Temporarily disable complex imports to get basic service running
+# from pdf_analyzer import PDFAnalyzer
+# from thumbnail_generator import ThumbnailGenerator
+# from cloud_integration import perform_cloud_detection, generate_cloud_overlay_thumbnails, should_perform_cloud_detection, enhance_detection_results_with_metadata
 
 # Import shared modules
 import sys
@@ -869,4 +870,3 @@ async def health_check():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8003)
-EOF < /dev/null

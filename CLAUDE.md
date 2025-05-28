@@ -371,4 +371,92 @@ docker-compose build [service-name]
 4. **Documentation**: Maintain BMAD story format and DoD requirements
 5. **Handoff Process**: Follow BMAD completion and review workflow
 
+## Common Fixes & Solutions Memory
+
+### JSX Syntax Issues
+**Problem**: TypeScript compiler errors with comparison operators in JSX text
+**Error**: `TS1003: Identifier expected.` when using `<` or `>` in JSX text content
+**Solution**: Escape comparison operators as HTML entities:
+- `<` → `&lt;`
+- `>` → `&gt;`
+- `<=` → `&lt;=`
+- `>=` → `&gt;=`
+**Example**: Change `<span>Low (<70%)</span>` to `<span>Low (&lt;70%)</span>`
+
+### TypeScript Path Mapping Issues
+**Problem**: Module resolution errors with `@/` imports
+**Error**: `Cannot find module '@/components/...'`
+**Solution**: Ensure tsconfig.json has proper path mapping:
+```json
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./*"]
+    }
+  }
+}
+```
+
+### Development Server Refresh Requirements
+**Problem**: Changes not reflecting in running application after file modifications
+**Solution**: Always restart development servers after making changes:
+- **Frontend**: Kill and restart `npm run dev` after TypeScript/component changes
+- **Backend**: Restart Python services after model/API changes
+- **Docker**: Use `docker-compose restart [service]` for containerized services
+**Why**: Hot reload can miss certain changes like type definitions, new imports, or configuration updates
+
+### Missing UI Components
+**Problem**: Import errors for shadcn/ui components
+**Error**: `Module '"@/components/ui/..."' has no exported member`
+**Solution**: 
+1. Check if component exists in `components/ui/`
+2. Create missing components using shadcn CLI: `npx shadcn-ui@latest add [component]`
+3. Verify export statements in component files
+
+### WebSocket Connection Issues
+**Problem**: Socket.io client connection failures
+**Solution**: Ensure proper client configuration with fallback transports:
+```typescript
+const socket = io(url, {
+  transports: ['websocket', 'polling'],
+  timeout: 20000,
+  reconnection: true,
+  reconnectionAttempts: 5
+});
+```
+
+### Fabric.js Performance Issues
+**Problem**: Canvas lag with many objects
+**Solution**: 
+- Enable performance mode: `canvas.renderOnAddRemove = false`
+- Use object caching: `object.cache()`
+- Batch operations: `canvas.requestRenderAll()`
+- Implement viewport culling for large datasets
+
+### Zustand Store Type Safety
+**Problem**: TypeScript errors with store actions
+**Solution**: Ensure proper typing with state and actions separation:
+```typescript
+interface State {
+  // state properties
+}
+
+interface Actions {
+  // action methods
+}
+
+type Store = State & Actions;
+```
+
+### AI Training Data Workflow
+**Pattern**: Symbol extraction from legend PDFs for ML training
+**Implementation**: Multi-stage pipeline with visual extraction
+**Key Components**:
+1. `SymbolLegendExtractor` - UI workflow component
+2. `symbolExtractionService` - API client with WebSocket support
+3. `useSymbolExtraction` - React Query integration hook
+**Workflow**: Upload PDF → Detect Symbols → OCR Text → Pair Symbol-Description → Verify → Export Training Data
+**Best Practice**: Start ML training with legend sheets for clean, labeled examples
+
 This configuration enables effective AI-assisted development while maintaining the structured, quality-focused approach of the BMAD Method. The combination provides both tactical development guidance and strategic project management framework.
