@@ -1,0 +1,430 @@
+{
+  "models": {
+    "openai": {
+      "gpt-4-vision-preview": {
+        "displayName": "GPT-4 Vision Preview",
+        "description": "OpenAI's most capable vision model for analyzing images and documents",
+        "maxTokens": 4096,
+        "supportedFeatures": [
+          "vision",
+          "text-generation",
+          "reasoning",
+          "code-analysis"
+        ],
+        "inputCost": 0.01,
+        "outputCost": 0.03,
+        "visionCost": 0.00765,
+        "contextWindow": 128000,
+        "maxImageSize": 20971520,
+        "supportedFormats": ["jpeg", "png", "gif", "webp"],
+        "parameters": {
+          "temperature": {
+            "default": 0.1,
+            "min": 0.0,
+            "max": 2.0,
+            "description": "Controls randomness in output"
+          },
+          "top_p": {
+            "default": 1.0,
+            "min": 0.0,
+            "max": 1.0,
+            "description": "Controls diversity via nucleus sampling"
+          },
+          "max_tokens": {
+            "default": 4096,
+            "min": 1,
+            "max": 4096,
+            "description": "Maximum number of tokens to generate"
+          },
+          "frequency_penalty": {
+            "default": 0.0,
+            "min": -2.0,
+            "max": 2.0,
+            "description": "Decreases likelihood of repeating tokens"
+          },
+          "presence_penalty": {
+            "default": 0.0,
+            "min": -2.0,
+            "max": 2.0,
+            "description": "Increases likelihood of new topics"
+          }
+        },
+        "capabilities": {
+          "imageAnalysis": true,
+          "documentAnalysis": true,
+          "technicalDrawings": true,
+          "componentIdentification": true,
+          "schematicAnalysis": true,
+          "multipleImages": true,
+          "streaming": false
+        }
+      },
+      "gpt-4-turbo-vision": {
+        "displayName": "GPT-4 Turbo Vision",
+        "description": "Faster and more cost-effective vision model",
+        "maxTokens": 4096,
+        "supportedFeatures": [
+          "vision",
+          "text-generation",
+          "reasoning"
+        ],
+        "inputCost": 0.01,
+        "outputCost": 0.03,
+        "visionCost": 0.00765,
+        "contextWindow": 128000,
+        "maxImageSize": 20971520,
+        "supportedFormats": ["jpeg", "png", "gif", "webp"],
+        "parameters": {
+          "temperature": {
+            "default": 0.1,
+            "min": 0.0,
+            "max": 2.0,
+            "description": "Controls randomness in output"
+          },
+          "top_p": {
+            "default": 1.0,
+            "min": 0.0,
+            "max": 1.0,
+            "description": "Controls diversity via nucleus sampling"
+          },
+          "max_tokens": {
+            "default": 4096,
+            "min": 1,
+            "max": 4096,
+            "description": "Maximum number of tokens to generate"
+          }
+        },
+        "capabilities": {
+          "imageAnalysis": true,
+          "documentAnalysis": true,
+          "technicalDrawings": true,
+          "componentIdentification": true,
+          "schematicAnalysis": true,
+          "multipleImages": true,
+          "streaming": true
+        }
+      }
+    },
+    "anthropic": {
+      "claude-3-5-sonnet-20241022": {
+        "displayName": "Claude 3.5 Sonnet",
+        "description": "Anthropic's most capable model with excellent vision capabilities",
+        "maxTokens": 4096,
+        "supportedFeatures": [
+          "vision",
+          "text-generation",
+          "reasoning",
+          "code-analysis",
+          "mathematical-reasoning"
+        ],
+        "inputCost": 0.003,
+        "outputCost": 0.015,
+        "contextWindow": 200000,
+        "maxImageSize": 5242880,
+        "supportedFormats": ["jpeg", "png", "gif", "webp"],
+        "parameters": {
+          "temperature": {
+            "default": 0.1,
+            "min": 0.0,
+            "max": 1.0,
+            "description": "Controls randomness in output"
+          },
+          "top_p": {
+            "default": 1.0,
+            "min": 0.0,
+            "max": 1.0,
+            "description": "Controls diversity via nucleus sampling"
+          },
+          "max_tokens": {
+            "default": 4096,
+            "min": 1,
+            "max": 4096,
+            "description": "Maximum number of tokens to generate"
+          },
+          "top_k": {
+            "default": 40,
+            "min": 1,
+            "max": 200,
+            "description": "Limits token selection to top K choices"
+          }
+        },
+        "capabilities": {
+          "imageAnalysis": true,
+          "documentAnalysis": true,
+          "technicalDrawings": true,
+          "componentIdentification": true,
+          "schematicAnalysis": true,
+          "multipleImages": true,
+          "streaming": true,
+          "codeGeneration": true
+        }
+      },
+      "claude-3-opus-20240229": {
+        "displayName": "Claude 3 Opus",
+        "description": "Anthropic's most powerful model for complex reasoning tasks",
+        "maxTokens": 4096,
+        "supportedFeatures": [
+          "vision",
+          "text-generation",
+          "reasoning",
+          "code-analysis",
+          "mathematical-reasoning"
+        ],
+        "inputCost": 0.015,
+        "outputCost": 0.075,
+        "contextWindow": 200000,
+        "maxImageSize": 5242880,
+        "supportedFormats": ["jpeg", "png", "gif", "webp"],
+        "parameters": {
+          "temperature": {
+            "default": 0.1,
+            "min": 0.0,
+            "max": 1.0,
+            "description": "Controls randomness in output"
+          },
+          "top_p": {
+            "default": 1.0,
+            "min": 0.0,
+            "max": 1.0,
+            "description": "Controls diversity via nucleus sampling"
+          },
+          "max_tokens": {
+            "default": 4096,
+            "min": 1,
+            "max": 4096,
+            "description": "Maximum number of tokens to generate"
+          }
+        },
+        "capabilities": {
+          "imageAnalysis": true,
+          "documentAnalysis": true,
+          "technicalDrawings": true,
+          "componentIdentification": true,
+          "schematicAnalysis": true,
+          "multipleImages": true,
+          "streaming": true,
+          "complexReasoning": true,
+          "codeGeneration": true
+        }
+      }
+    },
+    "google": {
+      "gemini-pro-vision": {
+        "displayName": "Gemini Pro Vision",
+        "description": "Google's multimodal model with strong vision capabilities",
+        "maxTokens": 2048,
+        "supportedFeatures": [
+          "vision",
+          "text-generation",
+          "reasoning"
+        ],
+        "inputCost": 0.00025,
+        "outputCost": 0.0005,
+        "contextWindow": 32760,
+        "maxImageSize": 4194304,
+        "supportedFormats": ["jpeg", "png"],
+        "parameters": {
+          "temperature": {
+            "default": 0.1,
+            "min": 0.0,
+            "max": 2.0,
+            "description": "Controls randomness in output"
+          },
+          "top_p": {
+            "default": 0.8,
+            "min": 0.0,
+            "max": 1.0,
+            "description": "Controls diversity via nucleus sampling"
+          },
+          "top_k": {
+            "default": 40,
+            "min": 1,
+            "max": 100,
+            "description": "Limits token selection to top K choices"
+          },
+          "max_output_tokens": {
+            "default": 2048,
+            "min": 1,
+            "max": 2048,
+            "description": "Maximum number of tokens to generate"
+          }
+        },
+        "capabilities": {
+          "imageAnalysis": true,
+          "documentAnalysis": true,
+          "technicalDrawings": true,
+          "componentIdentification": true,
+          "schematicAnalysis": true,
+          "multipleImages": false,
+          "streaming": true
+        }
+      },
+      "gemini-1.5-pro-vision": {
+        "displayName": "Gemini 1.5 Pro Vision",
+        "description": "Enhanced version with improved context window and capabilities",
+        "maxTokens": 8192,
+        "supportedFeatures": [
+          "vision",
+          "text-generation",
+          "reasoning",
+          "code-analysis"
+        ],
+        "inputCost": 0.00025,
+        "outputCost": 0.0005,
+        "contextWindow": 1048576,
+        "maxImageSize": 4194304,
+        "supportedFormats": ["jpeg", "png", "webp"],
+        "parameters": {
+          "temperature": {
+            "default": 0.1,
+            "min": 0.0,
+            "max": 2.0,
+            "description": "Controls randomness in output"
+          },
+          "top_p": {
+            "default": 0.8,
+            "min": 0.0,
+            "max": 1.0,
+            "description": "Controls diversity via nucleus sampling"
+          },
+          "top_k": {
+            "default": 40,
+            "min": 1,
+            "max": 100,
+            "description": "Limits token selection to top K choices"
+          },
+          "max_output_tokens": {
+            "default": 8192,
+            "min": 1,
+            "max": 8192,
+            "description": "Maximum number of tokens to generate"
+          }
+        },
+        "capabilities": {
+          "imageAnalysis": true,
+          "documentAnalysis": true,
+          "technicalDrawings": true,
+          "componentIdentification": true,
+          "schematicAnalysis": true,
+          "multipleImages": true,
+          "streaming": true,
+          "longContext": true,
+          "codeGeneration": true
+        }
+      }
+    }
+  },
+  "providerDefaults": {
+    "openai": {
+      "defaultModel": "gpt-4-vision-preview",
+      "fallbackModel": "gpt-4-turbo-vision",
+      "baseUrl": "https://api.openai.com/v1",
+      "apiVersion": "v1",
+      "timeout": 30000,
+      "retryAttempts": 3
+    },
+    "anthropic": {
+      "defaultModel": "claude-3-5-sonnet-20241022",
+      "fallbackModel": "claude-3-opus-20240229",
+      "baseUrl": "https://api.anthropic.com",
+      "apiVersion": "2023-06-01",
+      "timeout": 30000,
+      "retryAttempts": 3
+    },
+    "google": {
+      "defaultModel": "gemini-pro-vision",
+      "fallbackModel": "gemini-1.5-pro-vision",
+      "baseUrl": "https://generativelanguage.googleapis.com/v1",
+      "apiVersion": "v1",
+      "timeout": 30000,
+      "retryAttempts": 3
+    }
+  },
+  "capabilities": {
+    "vision": "Ability to analyze and understand images",
+    "text-generation": "Generate human-like text responses",
+    "reasoning": "Perform logical reasoning and analysis",
+    "code-analysis": "Understand and analyze code structures",
+    "mathematical-reasoning": "Solve mathematical problems and equations",
+    "streaming": "Support real-time response streaming",
+    "multipleImages": "Analyze multiple images in a single request",
+    "longContext": "Handle very long input contexts",
+    "complexReasoning": "Advanced reasoning capabilities",
+    "codeGeneration": "Generate code in various programming languages"
+  },
+  "imageFormats": {
+    "jpeg": {
+      "description": "JPEG image format",
+      "mimeTypes": ["image/jpeg", "image/jpg"],
+      "extensions": [".jpg", ".jpeg"],
+      "maxSize": 20971520,
+      "compression": "lossy"
+    },
+    "png": {
+      "description": "PNG image format",
+      "mimeTypes": ["image/png"],
+      "extensions": [".png"],
+      "maxSize": 20971520,
+      "compression": "lossless"
+    },
+    "gif": {
+      "description": "GIF image format",
+      "mimeTypes": ["image/gif"],
+      "extensions": [".gif"],
+      "maxSize": 10485760,
+      "compression": "lossless",
+      "animated": true
+    },
+    "webp": {
+      "description": "WebP image format",
+      "mimeTypes": ["image/webp"],
+      "extensions": [".webp"],
+      "maxSize": 15728640,
+      "compression": "both"
+    }
+  },
+  "electricalAnalysisProfiles": {
+    "componentIdentification": {
+      "description": "Optimized for identifying electrical components",
+      "recommendedModels": [
+        "gpt-4-vision-preview",
+        "claude-3-5-sonnet-20241022",
+        "gemini-pro-vision"
+      ],
+      "parameters": {
+        "temperature": 0.1,
+        "top_p": 0.9,
+        "max_tokens": 2048
+      },
+      "promptTemplate": "electrical_component_identification"
+    },
+    "schematicAnalysis": {
+      "description": "Optimized for analyzing electrical schematics",
+      "recommendedModels": [
+        "claude-3-5-sonnet-20241022",
+        "gpt-4-vision-preview",
+        "claude-3-opus-20240229"
+      ],
+      "parameters": {
+        "temperature": 0.05,
+        "top_p": 0.8,
+        "max_tokens": 4096
+      },
+      "promptTemplate": "electrical_schematic_analysis"
+    },
+    "generalAnalysis": {
+      "description": "General purpose electrical drawing analysis",
+      "recommendedModels": [
+        "gpt-4-vision-preview",
+        "claude-3-5-sonnet-20241022",
+        "gemini-1.5-pro-vision"
+      ],
+      "parameters": {
+        "temperature": 0.2,
+        "top_p": 0.95,
+        "max_tokens": 3072
+      },
+      "promptTemplate": "electrical_general_analysis"
+    }
+  }
+}

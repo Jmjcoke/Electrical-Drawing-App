@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(md-tree:*)",
+      "Bash(mkdir:*)",
+      "Bash(npm install)",
+      "Bash(mv:*)",
+      "Bash(npm test:*)",
+      "Bash(npm run lint)",
+      "Bash(npm run build:*)",
+      "Bash(find:*)",
+      "Bash(ls:*)",
+      "Bash(npm install:*)",
+      "Bash(npx tsc:*)",
+      "Bash(node:*)",
+      "Bash(timeout 5 npm start)",
+      "Bash(npx eslint:*)",
+      "Bash(npx:*)",
+      "Bash(grep:*)",
+      "Bash(npm run lint:*)",
+      "Bash(jest:*)",
+      "Bash(realpath:*)",
+      "Bash(python3:*)",
+      "Bash(git init:*)",
+      "Bash(git remote add:*)",
+      "Bash(git add:*)"
+    ],
+    "deny": []
+  }
+}
