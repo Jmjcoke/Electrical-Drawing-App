@@ -7,12 +7,17 @@ import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import rateLimit from 'express-rate-limit';
+import multer from 'multer';
 import dotenv from 'dotenv';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
+import { Pool } from 'pg';
 import { AnalysisController } from './controllers/analysis.controller';
 import { ContextChatController } from './controllers/context-chat.controller';
+import { SymbolDetectionController } from './controllers/symbol-detection.controller';
+import { SymbolDetectionService } from './detection/symbol-detector';
 import { contextWebSocketService } from './websocket/context-websocket.service';
+import { SymbolDetectionWebSocketEvents } from '../../../shared/types/symbol-detection.types';
 
 // Load environment variables
 dotenv.config();
@@ -33,6 +38,53 @@ const io = new Server(server, {
 
 // Initialize context WebSocket service
 contextWebSocketService.initialize(io);
+
+// Configure multer for file uploads
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 50 * 1024 * 1024, // 50MB max file size
+  },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype === 'application/pdf') {
+      cb(null, true);
+    } else {
+      cb(new Error('Only PDF files are allowed'));
+    }
+  },
+});
+
+// Initialize Database Connection
+const database = new Pool({
+  user: process.env.DB_USER || 'postgres',
+  host: process.env.DB_HOST || 'localhost',
+  database: process.env.DB_NAME || 'electrical_analysis',
+  password: process.env.DB_PASSWORD || 'password',
+  port: parseInt(process.env.DB_PORT || '5432'),
+  max: 20, // Maximum number of clients in the pool
+  idleTimeoutMillis: 30000, // How long a client is allowed to remain idle
+  connectionTimeoutMillis: 2000, // How long to wait when connecting a client
+});
+
+// Test database connection
+database.connect()
+  .then(client => {
+    console.log('✅ Database connected successfully');
+    client.release();
+  })
+  .catch(err => {
+    console.error('❌ Database connection failed:', err);
+    process.exit(1);
+  });
+
+// Initialize Symbol Detection Service with database
+const redisConfig = {
+  host: process.env.REDIS_HOST || 'localhost',
+  port: parseInt(process.env.REDIS_PORT || '6379'),
+  ...(process.env.REDIS_PASSWORD && { password: process.env.REDIS_PASSWORD }),
+};
+
+const symbolDetectionService = new SymbolDetectionService(redisConfig, database);
 
 // Security middleware
 app.use(helmet());
@@ -74,6 +126,7 @@ app.use((req, _res, next) => {
 // Initialize controllers
 const analysisController = new AnalysisController();
 const contextChatController = new ContextChatController();
+const symbolDetectionController = new SymbolDetectionController(symbolDetectionService);
 
 // API Routes
 // Image analysis routes
@@ -92,6 +145,25 @@ app.post('/api/v1/context/suggestions', contextChatController.getContextualSugge
 app.get('/api/v1/context/history/:sessionId', contextChatController.getConversationHistory);
 app.delete('/api/v1/context/reset/:sessionId', contextChatController.resetConversationContext);
 app.get('/api/v1/context/health/:sessionId?', contextChatController.getContextHealth);
+
+// Symbol Detection routes
+app.post('/api/v1/sessions/:sessionId/documents/:documentId/detect-symbols', 
+  upload.single('pdf'), symbolDetectionController.startDetection);
+app.get('/api/v1/sessions/:sessionId/detection-results/:resultId', 
+  symbolDetectionController.getDetectionResult);
+app.get('/api/v1/sessions/:sessionId/detection-results', 
+  symbolDetectionController.listDetectionResults);
+app.get('/api/v1/sessions/:sessionId/detection-jobs/:jobId/status', 
+  symbolDetectionController.getJobStatus);
+app.delete('/api/v1/sessions/:sessionId/detection-jobs/:jobId', 
+  symbolDetectionController.cancelDetection);
+app.put('/api/v1/sessions/:sessionId/detection-results/:resultId/validate', 
+  symbolDetectionController.validateDetectionResult);
+app.delete('/api/v1/sessions/:sessionId/detection-results/:resultId', 
+  symbolDetectionController.deleteDetectionResult);
+app.get('/api/v1/symbol-library', symbolDetectionController.getSymbolLibrary);
+app.post('/api/v1/symbol-library/validate', symbolDetectionController.validateCustomSymbol);
+app.get('/api/v1/detection-queue/stats', symbolDetectionController.getQueueStatistics);
 
 // System health
 app.get('/api/v1/health', analysisController.healthCheck);
@@ -115,9 +187,90 @@ app.get('/', (_req, res) => {
       'GET /api/v1/context/history/:sessionId',
       'DELETE /api/v1/context/reset/:sessionId',
       'GET /api/v1/context/health/:sessionId?',
+      'POST /api/v1/sessions/:sessionId/documents/:documentId/detect-symbols',
+      'GET /api/v1/sessions/:sessionId/detection-results/:resultId',
+      'GET /api/v1/sessions/:sessionId/detection-results',
+      'GET /api/v1/sessions/:sessionId/detection-jobs/:jobId/status',
+      'DELETE /api/v1/sessions/:sessionId/detection-jobs/:jobId',
+      'PUT /api/v1/sessions/:sessionId/detection-results/:resultId/validate',
+      'DELETE /api/v1/sessions/:sessionId/detection-results/:resultId',
+      'GET /api/v1/symbol-library',
+      'POST /api/v1/symbol-library/validate',
+      'GET /api/v1/detection-queue/stats',
       'GET /api/v1/health',
     ]
   });
+});
+
+// Setup WebSocket event handlers for symbol detection
+io.on('connection', (socket) => {
+  console.log('Client connected for symbol detection:', socket.id);
+
+  // Handle symbol detection WebSocket events
+  socket.on('start-symbol-detection', async (data: SymbolDetectionWebSocketEvents['start-symbol-detection']) => {
+    try {
+      console.log('Symbol detection started via WebSocket:', data);
+      // This would typically be handled through the REST API
+      // WebSocket is primarily used for progress updates
+      socket.emit('symbol-detection-error', {
+        jobId: 'websocket-not-supported',
+        error: 'Symbol detection must be started via REST API, WebSocket used for progress updates only'
+      });
+    } catch (error) {
+      console.error('WebSocket symbol detection error:', error);
+      socket.emit('symbol-detection-error', {
+        jobId: data.sessionId,
+        error: 'Failed to start symbol detection'
+      });
+    }
+  });
+
+  socket.on('cancel-symbol-detection', async (data: SymbolDetectionWebSocketEvents['cancel-symbol-detection']) => {
+    try {
+      console.log('Symbol detection cancellation requested via WebSocket:', data);
+      const cancelled = await symbolDetectionService.cancelJob(data.detectionJobId);
+      if (cancelled) {
+        socket.emit('symbol-detection-error', {
+          jobId: data.detectionJobId,
+          error: 'Detection cancelled by user'
+        });
+      }
+    } catch (error) {
+      console.error('WebSocket symbol detection cancellation error:', error);
+      socket.emit('symbol-detection-error', {
+        jobId: data.detectionJobId,
+        error: 'Failed to cancel symbol detection'
+      });
+    }
+  });
+
+  socket.on('disconnect', () => {
+    console.log('Client disconnected from symbol detection:', socket.id);
+  });
+});
+
+// Forward symbol detection service events to WebSocket clients
+symbolDetectionService.on('detection-started', (data) => {
+  io.emit('symbol-detection-started', {
+    jobId: data.jobIds[0],
+    estimatedTime: data.estimatedTime
+  });
+});
+
+symbolDetectionService.on('detection-progress', (data) => {
+  io.emit('symbol-detection-progress', data);
+});
+
+symbolDetectionService.on('detection-completed', (data) => {
+  io.emit('symbol-detection-completed', data);
+});
+
+symbolDetectionService.on('detection-error', (data) => {
+  io.emit('symbol-detection-error', data);
+});
+
+symbolDetectionService.on('symbol-detected', (data) => {
+  io.emit('symbol-detected', data);
 });
 
 // Error handling middleware
@@ -203,6 +356,13 @@ const gracefulShutdown = async (signal: string) => {
   
   // Shutdown context WebSocket service first
   await contextWebSocketService.shutdown();
+  
+  // Shutdown symbol detection service
+  await symbolDetectionService.shutdown();
+  
+  // Close database connections
+  await database.end();
+  console.log('Database connections closed.');
   
   server.close(() => {
     console.log('HTTP server closed.');

@@ -303,7 +303,7 @@ class ContextMonitorService {
             });
         }
     }
-    trackError(operation, contextId, sessionId, errorMessage) {
+    trackError(operation, contextId, sessionId, _errorMessage) {
         const errorKey = `${operation}:error`;
         const currentCount = this.errorCounts.get(errorKey) || 0;
         this.errorCounts.set(errorKey, currentCount + 1);

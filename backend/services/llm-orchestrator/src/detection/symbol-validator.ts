@@ -9,8 +9,6 @@ import {
   DetectedSymbol,
   ElectricalSymbolType,
   SymbolCategory,
-  BoundingBox,
-  Point,
   SymbolDetectionError
 } from '../../../../shared/types/symbol-detection.types';
 import { CoordinateMapper } from '../vision/coordinate-mapper';
@@ -47,7 +45,12 @@ export interface CircuitValidationRules {
 
 export class SymbolValidator {
   private validationRules: ValidationRule[] = [];
-  private circuitRules: CircuitValidationRules;
+  private circuitRules: CircuitValidationRules = {
+    minDistance: 0,
+    maxDistance: 0,
+    allowedConnections: {} as Record<ElectricalSymbolType, ElectricalSymbolType[]>,
+    forbiddenPlacements: {} as Record<ElectricalSymbolType, SymbolCategory[]>
+  };
 
   constructor() {
     this.initializeValidationRules();
@@ -90,7 +93,8 @@ export class SymbolValidator {
           ruleCount++;
 
         } catch (error) {
-          console.warn(`Validation rule '${rule.name}' failed:`, error.message);
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          console.warn(`Validation rule '${rule.name}' failed:`, errorMessage);
         }
       }
 
@@ -98,8 +102,9 @@ export class SymbolValidator {
       return Math.max(0, Math.min(1, totalScore));
 
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       throw new SymbolDetectionError(
-        `Symbol validation failed: ${error.message}`,
+        `Symbol validation failed: ${errorMessage}`,
         'SYMBOL_VALIDATION_ERROR',
         { symbolId: symbol.id, symbolType: symbol.symbolType }
       );
@@ -132,8 +137,9 @@ export class SymbolValidator {
       return this.validateCircuitCoherence(validatedSymbols);
 
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       throw new SymbolDetectionError(
-        `False positive filtering failed: ${error.message}`,
+        `False positive filtering failed: ${errorMessage}`,
         'FALSE_POSITIVE_FILTERING_ERROR',
         { symbolsCount: symbols.length }
       );
@@ -187,7 +193,8 @@ export class SymbolValidator {
       return false;
 
     } catch (error) {
-      console.warn('False positive detection failed:', error.message);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.warn('False positive detection failed:', errorMessage);
       return false; // Conservative approach - don't filter if uncertain
     }
   }
@@ -248,7 +255,7 @@ export class SymbolValidator {
   /**
    * Check if symbol is likely misclassified text
    */
-  private async isLikelyText(symbol: DetectedSymbol, imageBuffer: Buffer): Promise<boolean> {
+  private async isLikelyText(symbol: DetectedSymbol, _imageBuffer: Buffer): Promise<boolean> {
     try {
       // Heuristics for text detection:
       
@@ -270,7 +277,8 @@ export class SymbolValidator {
       return false;
 
     } catch (error) {
-      console.warn('Text detection failed:', error.message);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.warn('Text detection failed:', errorMessage);
       return false;
     }
   }
@@ -388,7 +396,7 @@ export class SymbolValidator {
         description: 'Check geometric consistency of symbol',
         severity: 'error',
         category: 'geometric',
-        validate: (symbol, context) => {
+        validate: (symbol, _context) => {
           const isValid = !this.hasInconsistentGeometry(symbol);
           return {
             isValid,
@@ -403,7 +411,7 @@ export class SymbolValidator {
         description: 'Validate symbol size is reasonable',
         severity: 'warning',
         category: 'geometric',
-        validate: (symbol, context) => {
+        validate: (symbol, _context) => {
           const area = symbol.boundingBox.area;
           const isValid = area >= 50 && area <= 50000;
           return {
@@ -419,7 +427,7 @@ export class SymbolValidator {
         description: 'Check distance from image edges',
         severity: 'warning',
         category: 'contextual',
-        validate: (symbol, context) => {
+        validate: (symbol, _context) => {
           const isAtEdge = this.isAtImageEdge(symbol);
           return {
             isValid: !isAtEdge,
@@ -434,8 +442,8 @@ export class SymbolValidator {
         description: 'Check for excessive overlap with other symbols',
         severity: 'error',
         category: 'contextual',
-        validate: (symbol, context) => {
-          const overlapping = this.findOverlappingSymbols(symbol, context.allSymbols);
+        validate: (symbol, _context) => {
+          const overlapping = this.findOverlappingSymbols(symbol, _context.allSymbols);
           const hasExcessiveOverlap = overlapping.some(other => {
             const iou = CoordinateMapper.calculateIoU(symbol.boundingBox, other.boundingBox);
             return iou > 0.8; // 80% overlap is excessive
@@ -454,8 +462,8 @@ export class SymbolValidator {
         description: 'Validate electrical context and connections',
         severity: 'info',
         category: 'electrical',
-        validate: (symbol, context) => {
-          const nearbySymbols = this.findNearbySymbols(symbol, context.allSymbols);
+        validate: (symbol, _context) => {
+          const nearbySymbols = this.findNearbySymbols(symbol, _context.allSymbols);
           const hasElectricalContext = nearbySymbols.length > 0;
           
           return {
@@ -498,9 +506,25 @@ export class SymbolValidator {
         'unknown': [], // No restrictions for unknown symbols
       },
       forbiddenPlacements: {
-        'power_supply': ['power'], // Don't place multiple power supplies close together
+        'resistor': [],
+        'capacitor': [],
+        'inductor': [],
+        'diode': [],
+        'transistor': [],
+        'integrated_circuit': [],
+        'connector': [],
+        'switch': [],
+        'relay': [],
+        'transformer': [],
         'ground': [], // Ground can be placed anywhere
+        'power_supply': ['power'], // Don't place multiple power supplies close together
         'battery': ['power'], // Don't place near other power sources
+        'fuse': [],
+        'led': [],
+        'operational_amplifier': [],
+        'logic_gate': [],
+        'custom': [],
+        'unknown': [],
       },
     };
   }

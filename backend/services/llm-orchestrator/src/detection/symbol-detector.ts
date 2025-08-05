@@ -8,6 +8,7 @@
 import { EventEmitter } from 'events';
 import { v4 as uuidv4 } from 'uuid';
 import Queue from 'bull';
+import { Pool } from 'pg';
 import { 
   SymbolDetectionResult, 
   DetectedSymbol, 
@@ -22,6 +23,8 @@ import { PatternMatcher } from './pattern-matcher';
 import { MLClassifier } from './ml-classifier';
 import { ConfidenceScorer } from './confidence-scorer';
 import { SymbolValidator } from './symbol-validator';
+import { SymbolDetectionStorageService } from '../services/symbol-detection-storage.service';
+import { SymbolDetectionPerformanceMonitor } from '../monitoring/symbol-detection-performance.monitor';
 
 export class SymbolDetectionService extends EventEmitter {
   private imageProcessor: ImageProcessor;
@@ -30,9 +33,12 @@ export class SymbolDetectionService extends EventEmitter {
   private confidenceScorer: ConfidenceScorer;
   private symbolValidator: SymbolValidator;
   private detectionQueue: Queue.Queue;
+  private storageService: SymbolDetectionStorageService;
+  private performanceMonitor: SymbolDetectionPerformanceMonitor;
 
   constructor(
-    redisConfig: { host: string; port: number; password?: string }
+    redisConfig: { host: string; port: number; password?: string },
+    database: Pool
   ) {
     super();
     
@@ -41,6 +47,19 @@ export class SymbolDetectionService extends EventEmitter {
     this.mlClassifier = new MLClassifier();
     this.confidenceScorer = new ConfidenceScorer();
     this.symbolValidator = new SymbolValidator();
+    this.storageService = new SymbolDetectionStorageService(database);
+    this.performanceMonitor = new SymbolDetectionPerformanceMonitor();
+    
+    // Set up performance monitoring events
+    this.performanceMonitor.on('performance-violation', (data) => {
+      console.warn('Performance violation detected:', data.violations);
+      this.emit('performance-warning', data);
+    });
+    
+    this.performanceMonitor.on('memory-warning', (data) => {
+      console.warn('Memory usage warning:', data);
+      this.emit('memory-warning', data);
+    });
     
     // Initialize Bull queue for processing detection jobs
     this.detectionQueue = new Queue('symbol detection', {
@@ -60,7 +79,7 @@ export class SymbolDetectionService extends EventEmitter {
   }
 
   /**
-   * Process a document for symbol detection
+   * Process a document for symbol detection with caching support
    */
   async processDocument(
     documentId: string,
@@ -82,22 +101,54 @@ export class SymbolDetectionService extends EventEmitter {
       const images = await this.imageProcessor.convertPdfToImages(pdfBuffer);
       
       const jobPromises: Promise<string>[] = [];
+      const cachedResults: SymbolDetectionResult[] = [];
 
-      // Create detection jobs for each page
+      // Check cache for each page and create jobs for non-cached pages
       for (let pageIndex = 0; pageIndex < images.length; pageIndex++) {
-        const jobId = uuidv4();
+        const pageNumber = pageIndex + 1;
+        const imageBuffer = images[pageIndex];
+
+        // Check if result is cached
+        const cachedResult = await this.storageService.getCachedDetectionResult(
+          imageBuffer,
+          pageNumber,
+          detectionSettings
+        );
+
+        if (cachedResult) {
+          cachedResults.push(cachedResult);
+          console.log(`Using cached result for page ${pageNumber} of document ${documentId}`);
+          
+          // Emit cached result immediately
+          this.emit('detection-completed', {
+            jobId: `cached-${pageNumber}`,
+            result: cachedResult,
+          });
+          
+          continue;
+        }
+
+        // Create database job record
+        const jobId = await this.storageService.createDetectionJob(
+          documentId,
+          sessionId,
+          pageNumber,
+          detectionSettings,
+          imageBuffer
+        );
+
         const job: DetectionJob = {
           id: jobId,
           documentId,
           sessionId,
-          pageNumber: pageIndex + 1,
-          imageBuffer: images[pageIndex],
+          pageNumber,
+          imageBuffer,
           settings: detectionSettings,
           createdAt: new Date(),
           status: 'pending',
         };
 
-        // Add job to queue
+        // Add job to processing queue
         const queueJob = await this.detectionQueue.add('detect-symbols', job, {
           jobId,
           timeout: detectionSettings.processingTimeout,
@@ -108,19 +159,21 @@ export class SymbolDetectionService extends EventEmitter {
 
       const jobIds = await Promise.all(jobPromises);
       
-      // Emit detection started event with time estimate
+      // Calculate time estimate (adjust for cached results)
+      const uncachedPages = images.length - cachedResults.length;
       const estimatedTimePerPage = 5000; // 5 seconds per page estimate
-      const estimatedTotalTime = images.length * estimatedTimePerPage;
+      const estimatedTotalTime = uncachedPages * estimatedTimePerPage;
       
       this.emit('detection-started', {
         documentId,
         sessionId,
         jobIds,
         totalPages: images.length,
+        cachedPages: cachedResults.length,
         estimatedTime: estimatedTotalTime,
       });
 
-      return jobIds[0]; // Return first job ID as primary identifier
+      return jobIds.length > 0 ? jobIds[0] : `cached-all-${documentId}`; // Return first job ID or cache indicator
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       throw new SymbolDetectionError(
@@ -132,13 +185,15 @@ export class SymbolDetectionService extends EventEmitter {
   }
 
   /**
-   * Process a single page for symbol detection
+   * Process a single page for symbol detection with database integration
    */
   async processPage(job: DetectionJob): Promise<SymbolDetectionResult> {
     const startTime = Date.now();
     
     try {
-      // Update job status
+      // Update job status in database
+      await this.storageService.updateJobProgress(job.id, 'processing', 'Image preprocessing', 10);
+      
       job.status = 'processing';
       job.progressStage = 'Image preprocessing';
       job.progressPercent = 10;
@@ -156,6 +211,9 @@ export class SymbolDetectionService extends EventEmitter {
       );
 
       const imageQuality = await this.imageProcessor.assessImageQuality(preprocessedImage);
+      
+      // Update progress in database
+      await this.storageService.updateJobProgress(job.id, 'processing', 'Pattern matching', 30);
       
       job.progressStage = 'Pattern matching';
       job.progressPercent = 30;
@@ -182,6 +240,9 @@ export class SymbolDetectionService extends EventEmitter {
       
       const patternMatchingTime = Date.now() - patternMatchingStartTime;
 
+      // Update progress in database
+      await this.storageService.updateJobProgress(job.id, 'processing', 'ML classification', 50);
+      
       job.progressStage = 'ML classification';
       job.progressPercent = 50;
       this.emit('detection-progress', {
@@ -205,6 +266,9 @@ export class SymbolDetectionService extends EventEmitter {
       
       const mlClassificationTime = Date.now() - mlClassificationStartTime;
 
+      // Update progress in database
+      await this.storageService.updateJobProgress(job.id, 'processing', 'Confidence scoring', 70);
+      
       job.progressStage = 'Confidence scoring';
       job.progressPercent = 70;
       this.emit('detection-progress', {
@@ -223,6 +287,11 @@ export class SymbolDetectionService extends EventEmitter {
         const symbolProgress = 70 + Math.floor((i / detectedSymbols.length) * 15);
         job.progressPercent = symbolProgress;
         job.progressStage = `Validating symbol ${i + 1}/${detectedSymbols.length}: ${symbol.symbolType}`;
+        
+        // Update database progress every 5 symbols to avoid too many DB calls
+        if (i % 5 === 0 || i === detectedSymbols.length - 1) {
+          await this.storageService.updateJobProgress(job.id, 'processing', job.progressStage, symbolProgress);
+        }
         
         this.emit('detection-progress', {
           jobId: job.id,
@@ -248,6 +317,9 @@ export class SymbolDetectionService extends EventEmitter {
       
       const validationTime = Date.now() - validationStartTime;
 
+      // Update progress in database
+      await this.storageService.updateJobProgress(job.id, 'processing', 'Finalizing results', 90);
+      
       job.progressStage = 'Finalizing results';
       job.progressPercent = 90;
       this.emit('detection-progress', {
@@ -298,12 +370,33 @@ export class SymbolDetectionService extends EventEmitter {
         createdAt: new Date(),
       };
 
+      // Store result in database with caching
+      const { resultId, cached } = await this.storageService.storeDetectionResult(
+        result,
+        job.imageBuffer,
+        job.settings
+      );
+      
+      // Track performance metrics
+      this.performanceMonitor.trackProcessing(
+        job.documentId,
+        job.sessionId,
+        detectionMetadata,
+        result
+      );
+
+      // Update job as completed
+      await this.storageService.updateJobProgress(job.id, 'completed', 'Detection completed', 100);
+      
       job.status = 'completed';
       job.progressPercent = 100;
       
       this.emit('detection-completed', {
         jobId: job.id,
         result,
+        cached,
+        storedResultId: resultId,
+        performanceStats: this.performanceMonitor.getPerformanceStats(),
       });
 
       // Emit individual symbol detection events
@@ -318,6 +411,14 @@ export class SymbolDetectionService extends EventEmitter {
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      // Update job status in database
+      try {
+        await this.storageService.updateJobProgress(job.id, 'failed');
+      } catch (dbError) {
+        console.error('Failed to update job status in database:', dbError);
+      }
+      
       job.status = 'failed';
       
       this.emit('detection-error', {
@@ -488,10 +589,107 @@ export class SymbolDetectionService extends EventEmitter {
   }
 
   /**
+   * Get stored detection result by ID
+   */
+  async getDetectionResult(resultId: string): Promise<SymbolDetectionResult | null> {
+    return await this.storageService.getDetectionResult(resultId);
+  }
+
+  /**
+   * List detection results for a session
+   */
+  async listSessionDetectionResults(
+    sessionId: string,
+    options: {
+      limit?: number;
+      offset?: number;
+      minConfidence?: number;
+      symbolTypes?: string[];
+      dateFrom?: Date;
+      dateTo?: Date;
+    } = {}
+  ) {
+    return await this.storageService.listSessionDetectionResults(sessionId, options);
+  }
+
+  /**
+   * Validate a detected symbol against the symbol library
+   */
+  async validateDetectedSymbol(symbol: DetectedSymbol) {
+    return await this.storageService.validateDetectedSymbol(symbol);
+  }
+
+  /**
+   * Get symbol library entries
+   */
+  async getSymbolLibrary(filters: { symbolType?: string; symbolCategory?: string } = {}) {
+    return await this.storageService.getSymbolLibrary(filters);
+  }
+
+  /**
+   * Delete a detection result
+   */
+  async deleteDetectionResult(resultId: string): Promise<boolean> {
+    return await this.storageService.deleteDetectionResult(resultId);
+  }
+
+  /**
+   * Get comprehensive storage statistics
+   */
+  async getStorageStatistics() {
+    return await this.storageService.getStorageStatistics();
+  }
+
+  /**
+   * Perform cache and data cleanup
+   */
+  async performCleanup() {
+    return await this.storageService.performCleanup();
+  }
+
+  /**
+   * Get comprehensive performance statistics
+   */
+  getPerformanceStats() {
+    return this.performanceMonitor.getPerformanceStats();
+  }
+  
+  /**
+   * Generate performance report
+   */
+  generatePerformanceReport() {
+    return this.performanceMonitor.generatePerformanceReport();
+  }
+  
+  /**
+   * Optimize system performance
+   */
+  async optimizePerformance(): Promise<void> {
+    await this.performanceMonitor.performComprehensiveCleanup();
+    
+    // Clean up individual components
+    if (this.imageProcessor && typeof this.imageProcessor.performCleanup === 'function') {
+      await this.imageProcessor.performCleanup();
+    }
+    
+    if (this.patternMatcher && typeof this.patternMatcher.performCleanup === 'function') {
+      await this.patternMatcher.performCleanup();
+    }
+    
+    if (this.mlClassifier && typeof this.mlClassifier.performOptimizedCleanup === 'function') {
+      await this.mlClassifier.performOptimizedCleanup();
+    }
+    
+    console.log('Symbol Detection Engine performance optimization completed');
+  }
+
+  /**
    * Clean up resources
    */
   async shutdown(): Promise<void> {
+    await this.performanceMonitor.performComprehensiveCleanup();
     await this.detectionQueue.close();
+    await this.storageService.shutdown();
     this.removeAllListeners();
   }
 }

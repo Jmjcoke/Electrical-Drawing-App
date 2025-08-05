@@ -305,6 +305,8 @@ export class ConversationContextService {
         type: entity.type,
         confidence: entity.confidence,
         context: turn.query.originalText,
+        turnId: turn.id,
+        position: entity.position || 0,
         firstMentioned: existing.length > 0 ? existing[0].firstMentioned : turn.timestamp,
         mentions: existing.length + 1
       };

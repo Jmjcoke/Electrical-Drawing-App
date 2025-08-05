@@ -71,8 +71,9 @@ export class ConfidenceScorer {
       return Math.max(0, Math.min(1, confidence));
 
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       throw new SymbolDetectionError(
-        `Confidence calculation failed: ${error.message}`,
+        `Confidence calculation failed: ${errorMessage}`,
         'CONFIDENCE_CALCULATION_ERROR',
         { symbolId: symbol.id, symbolType: symbol.symbolType }
       );
@@ -210,7 +211,8 @@ export class ConfidenceScorer {
       score = (score + sizeScore) / 2;
 
     } catch (error) {
-      console.warn('Context validation failed:', error.message);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.warn('Context validation failed:', errorMessage);
       score = 0.3; // Lower confidence if context analysis fails
     }
 
@@ -298,8 +300,8 @@ export class ConfidenceScorer {
    * Analyze local context around symbol
    */
   private async analyzeLocalContext(
-    symbol: DetectedSymbol,
-    imageBuffer: Buffer
+    _symbol: DetectedSymbol,
+    _imageBuffer: Buffer
   ): Promise<number> {
     try {
       // This would analyze the immediate vicinity of the symbol
@@ -309,7 +311,8 @@ export class ConfidenceScorer {
       return 0.6;
 
     } catch (error) {
-      console.warn('Local context analysis failed:', error.message);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.warn('Local context analysis failed:', errorMessage);
       return 0.4;
     }
   }
@@ -352,7 +355,7 @@ export class ConfidenceScorer {
     const area = bbox.area;
 
     // Expected size ranges for different symbol types
-    const sizeRanges = {
+    const sizeRanges: Partial<Record<string, { min: number; max: number }>> = {
       'resistor': { min: 800, max: 8000 },
       'capacitor': { min: 600, max: 6000 },
       'inductor': { min: 1000, max: 10000 },
@@ -397,7 +400,7 @@ export class ConfidenceScorer {
    * Get expected aspect ratio for symbol type
    */
   private getExpectedAspectRatio(symbolType: string): number {
-    const aspectRatios = {
+    const aspectRatios: Record<string, number> = {
       'resistor': 3.0,
       'capacitor': 1.5,
       'inductor': 2.5,
@@ -424,7 +427,7 @@ export class ConfidenceScorer {
    * Get expected complexity for symbol type
    */
   private getExpectedComplexity(symbolType: string): number {
-    const complexities = {
+    const complexities: Record<string, number> = {
       'resistor': 0.3,
       'capacitor': 0.2,
       'inductor': 0.6,

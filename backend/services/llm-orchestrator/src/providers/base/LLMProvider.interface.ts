@@ -39,6 +39,9 @@ export interface ProviderCapabilities {
   readonly supportedImageFormats: string[];
   readonly maxPromptLength: number;
   readonly supportsStreaming: boolean;
+  readonly supportsSymbolDetection: boolean;
+  readonly maxSymbolsPerDetection: number;
+  readonly symbolDetectionAccuracy: number;
 }
 
 export interface ProviderMetadata {
@@ -99,6 +102,43 @@ export interface LLMProvider {
    * @throws {ConfigurationError} When configuration is invalid
    */
   validateConfig(config: Record<string, unknown>): boolean;
+
+  /**
+   * Detects electrical symbols in an image using LLM vision capabilities
+   * @param image - Image buffer containing electrical schematic
+   * @param options - Symbol detection options
+   * @returns Promise resolving to detected symbols with confidence scores
+   * @throws {ProviderError} When symbol detection fails
+   */
+  detectSymbols?(image: Buffer, options?: SymbolDetectionOptions): Promise<LLMSymbolDetectionResult>;
+}
+
+export interface SymbolDetectionOptions {
+  readonly maxSymbols?: number;
+  readonly confidenceThreshold?: number;
+  readonly includeLocationCoordinates?: boolean;
+  readonly enableDescriptions?: boolean;
+  readonly symbolTypes?: string[];
+}
+
+export interface LLMDetectedSymbol {
+  readonly type: string;
+  readonly description: string;
+  readonly confidence: number;
+  readonly boundingBox?: {
+    readonly x: number;
+    readonly y: number;
+    readonly width: number;
+    readonly height: number;
+  };
+  readonly category?: string;
+}
+
+export interface LLMSymbolDetectionResult {
+  readonly symbols: LLMDetectedSymbol[];
+  readonly confidence: number;
+  readonly processingTime: number;
+  readonly metadata: Record<string, unknown>;
 }
 
 /**

@@ -122,16 +122,24 @@ export class CoordinateMapper {
     const transformedWidth = width * transform.scaleX;
     const transformedHeight = height * transform.scaleY;
 
-    return {
+    const result: BoundingBox = {
       x: transformedX,
       y: transformedY,
       width: transformedWidth,
       height: transformedHeight,
-      rotation: boundingBox.rotation 
-        ? boundingBox.rotation + transform.rotation 
-        : transform.rotation || undefined,
       area: transformedWidth * transformedHeight,
     };
+
+    // Only set rotation if it has a meaningful value
+    const finalRotation = boundingBox.rotation 
+      ? boundingBox.rotation + transform.rotation 
+      : transform.rotation;
+    
+    if (finalRotation !== 0) {
+      result.rotation = finalRotation;
+    }
+
+    return result;
   }
 
   /**
@@ -258,9 +266,13 @@ export class CoordinateMapper {
       y: boundingBox.y - margin,
       width: boundingBox.width + (margin * 2),
       height: boundingBox.height + (margin * 2),
-      rotation: boundingBox.rotation,
       area: (boundingBox.width + (margin * 2)) * (boundingBox.height + (margin * 2)),
     };
+
+    // Only set rotation if it exists
+    if (boundingBox.rotation !== undefined) {
+      expandedBox.rotation = boundingBox.rotation;
+    }
 
     // Clamp to image boundaries if provided
     if (imageWidth !== undefined && imageHeight !== undefined) {
@@ -313,14 +325,20 @@ export class CoordinateMapper {
             boxes[j].y + boxes[j].height
           );
 
-          currentBox = {
+          const mergedBox: BoundingBox = {
             x: minX,
             y: minY,
             width: maxX - minX,
             height: maxY - minY,
             area: (maxX - minX) * (maxY - minY),
-            rotation: currentBox.rotation, // Keep original rotation
           };
+
+          // Keep original rotation if it exists
+          if (currentBox.rotation !== undefined) {
+            mergedBox.rotation = currentBox.rotation;
+          }
+
+          currentBox = mergedBox;
 
           used.add(j);
         }
