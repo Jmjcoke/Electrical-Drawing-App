@@ -108,12 +108,16 @@ export class SymbolDetectionService extends EventEmitter {
 
       const jobIds = await Promise.all(jobPromises);
       
-      // Emit detection started event
+      // Emit detection started event with time estimate
+      const estimatedTimePerPage = 5000; // 5 seconds per page estimate
+      const estimatedTotalTime = images.length * estimatedTimePerPage;
+      
       this.emit('detection-started', {
         documentId,
         sessionId,
         jobIds,
         totalPages: images.length,
+        estimatedTime: estimatedTotalTime,
       });
 
       return jobIds[0]; // Return first job ID as primary identifier
@@ -212,7 +216,21 @@ export class SymbolDetectionService extends EventEmitter {
       // Step 4: Confidence scoring and validation
       const validationStartTime = Date.now();
       
-      for (const symbol of detectedSymbols) {
+      for (let i = 0; i < detectedSymbols.length; i++) {
+        const symbol = detectedSymbols[i];
+        
+        // Update progress for each symbol being processed
+        const symbolProgress = 70 + Math.floor((i / detectedSymbols.length) * 15);
+        job.progressPercent = symbolProgress;
+        job.progressStage = `Validating symbol ${i + 1}/${detectedSymbols.length}: ${symbol.symbolType}`;
+        
+        this.emit('detection-progress', {
+          jobId: job.id,
+          progress: job.progressPercent,
+          stage: job.progressStage,
+          currentSymbol: symbol.symbolType,
+        });
+        
         // Calculate multi-factor confidence score
         symbol.confidence = await this.confidenceScorer.calculateConfidence(
           symbol,
