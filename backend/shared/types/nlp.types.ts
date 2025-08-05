@@ -300,6 +300,21 @@ export interface NLPConfig {
     readonly fallbackIntent: QueryIntent['type'];
     readonly modelPath?: string;
     readonly trainingDataPath?: string;
+    readonly scoringWeights: {
+      readonly componentKeywordWeight: number;
+      readonly componentDesignatorWeight: number;
+      readonly componentPatternWeight: number;
+      readonly componentValueWeight: number;
+      readonly componentTermWeight: number;
+      readonly schematicKeywordWeight: number;
+      readonly schematicPatternWeight: number;
+      readonly schematicTermWeight: number;
+      readonly generalKeywordWeight: number;
+      readonly questionStartWeight: number;
+      readonly questionEndWeight: number;
+      readonly generalReductionFactor: number;
+      readonly dominantIntentBoost: number;
+    };
   };
   readonly extraction: {
     readonly entityTypes: ExtractedEntity['type'][];
