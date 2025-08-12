@@ -536,7 +536,7 @@ export class PdfService {
   }
 
   /**
-   * Attempt fallback conversion with different settings
+   * Attempt fallback conversion with different settings using parallel processing
    */
   private async attemptFallbackConversion(
     pdfBuffer: Buffer, 
@@ -554,11 +554,9 @@ export class PdfService {
       { density: 72, format: 'jpg', quality: 50 }
     ];
 
-    for (let i = 0; i < fallbackStrategies.length; i++) {
-      const strategy = fallbackStrategies[i];
-      
+    const fallbackPromises = fallbackStrategies.map(async (strategy, index) => {
       try {
-        logger.info(`Attempting fallback conversion strategy ${i + 1}`, {
+        logger.info(`Attempting fallback conversion strategy ${index + 1}`, {
           documentId,
           strategy: { density: strategy.density, format: strategy.format, quality: strategy.quality }
         });
@@ -567,22 +565,31 @@ export class PdfService {
         const result = await convert.bulk(-1);
         
         if (result && result.length > 0) {
-          logger.info(`Fallback conversion strategy ${i + 1} succeeded`, {
+          logger.info(`Fallback conversion strategy ${index + 1} succeeded`, {
             documentId,
             pages: result.length
           });
-          return result;
+          return { result, strategyIndex: index + 1 };
         }
+        throw new Error('No results returned');
       } catch (error) {
-        logger.warn(`Fallback conversion strategy ${i + 1} failed`, {
+        logger.warn(`Fallback conversion strategy ${index + 1} failed`, {
           documentId,
           error: error instanceof Error ? error.message : 'Unknown error'
         });
-        continue;
+        throw error;
+      }
+    });
+
+    const results = await Promise.allSettled(fallbackPromises);
+    
+    for (const result of results) {
+      if (result.status === 'fulfilled') {
+        return result.value.result;
       }
     }
-
-    // All fallback strategies failed
+    
+    // All strategies failed
     throw new Error('All conversion strategies failed');
   }
 

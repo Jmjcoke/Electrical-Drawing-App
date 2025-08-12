@@ -1,4 +1,3 @@
-import React from 'react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { CssBaseline, Container, Typography, Box, Paper } from '@mui/material';
 import FileUpload from './components/upload/FileUpload';

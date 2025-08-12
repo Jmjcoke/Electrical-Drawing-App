@@ -9,8 +9,7 @@ import {
 } from '../utils/fileValidation';
 import type { 
   UploadResponse, 
-  MultiFileUploadProgress, 
-  UploadErrorCodes 
+  MultiFileUploadProgress 
 } from '../types/api';
 
 interface FileWithId {
