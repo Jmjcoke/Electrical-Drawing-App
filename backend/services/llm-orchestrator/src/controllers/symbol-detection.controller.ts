@@ -11,6 +11,7 @@ import {
   SymbolDetectionError 
 } from '../../../../shared/types/symbol-detection.types';
 import { SymbolDetectionService } from '../detection/symbol-detector';
+import { RealSymbolDetectionService } from '../detection/symbol-detector-real';
 
 interface DetectionJobResponse {
   success: boolean;
@@ -30,10 +31,13 @@ interface DetectionResultsQuery {
   offset?: number;
 }
 
-export class SymbolDetectionController {
-  private detectionService: SymbolDetectionService;
+// Union type for both service implementations
+type SymbolDetectionServiceType = SymbolDetectionService | RealSymbolDetectionService;
 
-  constructor(detectionService: SymbolDetectionService) {
+export class SymbolDetectionController {
+  private detectionService: SymbolDetectionServiceType;
+
+  constructor(detectionService: SymbolDetectionServiceType) {
     this.detectionService = detectionService;
     
     // Bind methods to preserve 'this' context
@@ -219,19 +223,25 @@ export class SymbolDetectionController {
       const pageNumber = query.pageNumber ? parseInt(query.pageNumber.toString()) : undefined;
       const minConfidence = query.minConfidence ? parseFloat(query.minConfidence.toString()) : undefined;
 
-      // For now, this would typically query a database
-      // Since we don't have database integration yet, return a placeholder response
+      // Query database for detection results using the service's method
+      const results = await this.detectionService.listDetectionResults(sessionId, {
+        limit,
+        offset,
+        minConfidence,
+        symbolTypes: query.symbolType ? [query.symbolType] : undefined,
+      });
+      
       res.status(200).json({
         success: true,
-        message: 'Database integration pending - returning placeholder response',
         data: {
-          results: [],
+          results: results.results,
           pagination: {
-            total: 0,
+            total: results.total,
             limit,
             offset,
-            hasMore: false
+            hasMore: offset + limit < results.total
           },
+          summary: results.summary,
           filters: {
             sessionId,
             documentId: query.documentId,
@@ -376,14 +386,19 @@ export class SymbolDetectionController {
         return;
       }
 
-      // This would typically update the database with user corrections
-      // Since we don't have database integration yet, return a placeholder response
+      // Update the database with user corrections
+      const validationResult = await this.detectionService.validateDetectedSymbol({
+        id: resultId,
+        ...corrections,
+      } as any);
+      
       res.status(200).json({
         success: true,
-        message: 'Database integration pending - validation corrections received',
+        message: 'Detection result validation updated',
         data: {
           resultId,
           corrections: corrections || [],
+          validationResult,
           validatedAt: new Date().toISOString()
         }
       });
@@ -414,11 +429,20 @@ export class SymbolDetectionController {
         return;
       }
 
-      // This would typically delete from the database
-      // Since we don't have database integration yet, return a placeholder response
+      // Delete from the database
+      const deleted = await this.detectionService.deleteDetectionResult(resultId);
+      
+      if (!deleted) {
+        res.status(404).json({
+          success: false,
+          error: 'Detection result not found or already deleted'
+        });
+        return;
+      }
+      
       res.status(200).json({
         success: true,
-        message: 'Database integration pending - deletion request acknowledged',
+        message: 'Detection result deleted successfully',
         resultId,
         deletedAt: new Date().toISOString()
       });
@@ -436,10 +460,15 @@ export class SymbolDetectionController {
    * GET /api/symbol-library
    * Get available symbol types and categories
    */
-  async getSymbolLibrary(_req: Request, res: Response): Promise<void> {
+  async getSymbolLibrary(req: Request, res: Response): Promise<void> {
     try {
-      // Return the available symbol types and categories from the type definitions
+      // Query actual symbol library from database
+      const filters = req.query as { symbolType?: string; symbolCategory?: string };
+      const libraryEntries = await this.detectionService.getSymbolLibrary(filters);
+      
+      // Also provide the available types and categories
       const symbolLibrary = {
+        entries: libraryEntries,
         symbolTypes: [
           'resistor', 'capacitor', 'inductor', 'diode', 'transistor',
           'integrated_circuit', 'connector', 'switch', 'relay', 'transformer',
@@ -485,16 +514,25 @@ export class SymbolDetectionController {
         return;
       }
 
-      // This would typically validate against the symbol library database
-      // Since we don't have database integration yet, return a placeholder response
+      // Validate against the symbol library database
+      const symbolLibrary = await this.detectionService.getSymbolLibrary({
+        symbolType,
+        symbolCategory,
+      });
+      
+      // Check if symbol type exists in library
+      const matchedSymbol = symbolLibrary.find(
+        (lib: any) => lib.symbolType === symbolType && lib.symbolCategory === symbolCategory
+      );
+      
       res.status(200).json({
         success: true,
-        message: 'Symbol library integration pending - validation request acknowledged',
+        message: 'Symbol validation completed',
         data: {
-          isValid: true,
-          confidence: 0.85,
-          matchedTemplate: symbolType,
-          suggestions: [],
+          isValid: !!matchedSymbol,
+          confidence: matchedSymbol ? 0.95 : 0.0,
+          matchedTemplate: matchedSymbol?.symbolName || null,
+          suggestions: !matchedSymbol ? symbolLibrary.slice(0, 3).map((s: any) => s.symbolName) : [],
           validatedAt: new Date().toISOString()
         }
       });

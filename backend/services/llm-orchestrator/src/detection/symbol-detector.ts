@@ -613,6 +613,23 @@ export class SymbolDetectionService extends EventEmitter {
   }
 
   /**
+   * List detection results (alias for controller compatibility)
+   */
+  async listDetectionResults(
+    sessionId: string,
+    filters: {
+      documentId?: string;
+      pageNumber?: number;
+      symbolType?: string;
+      minConfidence?: number;
+      limit?: number;
+      offset?: number;
+    } = {}
+  ) {
+    return await this.storageService.listSessionDetectionResults(sessionId, filters);
+  }
+
+  /**
    * Validate a detected symbol against the symbol library
    */
   async validateDetectedSymbol(symbol: DetectedSymbol) {

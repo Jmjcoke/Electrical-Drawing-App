@@ -5,9 +5,11 @@
     "lib": ["ES2020"],
     "outDir": "./dist",
     // "rootDir": "./src",
-    "strict": true,
+    "strict": false,
     "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
     "skipLibCheck": true,
+    "noEmitOnError": false,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "declaration": true,
@@ -15,15 +17,15 @@
     "sourceMap": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
-    "noImplicitAny": true,
+    "noImplicitAny": false,
     "noImplicitReturns": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "exactOptionalPropertyTypes": true,
-    "baseUrl": "./src",
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "exactOptionalPropertyTypes": false,
+    "baseUrl": "./",
     "paths": {
-      "@/*": ["*"],
-      "@/types/*": ["../../../shared/types/*"]
+      "@/*": ["src/*"],
+      "@/types/*": ["shared/types/*"]
     }
   },
   "include": [

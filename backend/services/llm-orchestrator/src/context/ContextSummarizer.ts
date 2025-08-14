@@ -365,7 +365,7 @@ export class ContextSummarizer {
     cumulativeContext: CumulativeContext
   ): number {
     let relevanceScore = 0;
-    const turnText = `${turn.query.text} ${turn.response.summary || ''}`.toLowerCase();
+    const turnText = `${turn.query.originalText} ${turn.response.summary || ''}`.toLowerCase();
 
     // Check for mentions of important entities
     for (const [entity, mentions] of cumulativeContext.extractedEntities) {
@@ -595,7 +595,7 @@ export class ContextSummarizer {
     // Filter other context elements similarly
     const filteredDocuments = originalContext.documentContext.filter(doc =>
       remainingTurns.some(turn => 
-        turn.query.documentIds && turn.query.documentIds.includes(doc.documentId)
+        turn.query.context?.documentContext?.some(ref => ref.id === doc.documentId) || false
       )
     );
 
@@ -627,7 +627,7 @@ export class ContextSummarizer {
     
     // Conversation turns
     for (const turn of context.conversationThread) {
-      size += turn.query.text.length * 2; // UTF-16 encoding
+      size += turn.query.originalText.length * 2; // UTF-16 encoding
       size += (turn.response.summary || '').length * 2;
       size += turn.contextContributions.join('').length * 2;
       size += 500; // Other turn metadata
@@ -689,10 +689,11 @@ export class ContextSummarizer {
         return context.metadata.accessCount < 3;
       case 'no_follow_ups':
         return !context.conversationThread.some(turn => turn.followUpDetected);
-      case 'low_confidence':
+      case 'low_confidence': {
         const avgConfidence = context.conversationThread.reduce((sum, turn) => 
           sum + turn.response.confidence.overall, 0) / context.conversationThread.length;
         return avgConfidence < 0.5;
+      }
       default:
         return false;
     }

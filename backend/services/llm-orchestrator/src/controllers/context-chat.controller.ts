@@ -485,7 +485,7 @@ export class ContextChatController extends AnalysisController {
           const turn = context.conversationThread.find(t => t.id === cs.turnId);
           return turn ? {
             turnId: turn.id,
-            queryText: turn.query.text,
+            queryText: turn.query.originalText,
             relevance: cs.relevance,
             timestamp: turn.timestamp
           } : null;
@@ -530,18 +530,18 @@ export class ContextChatController extends AnalysisController {
     // Generate follow-up suggestions based on recent queries
     const recentTurns = context.conversationThread.slice(-3);
     for (const turn of recentTurns) {
-      if (turn.query.text.toLowerCase().includes('resistor')) {
+      if (turn.query.originalText.toLowerCase().includes('resistor')) {
         suggestions.push({
           type: 'follow_up',
           suggestion: 'What is the power rating of that resistor?',
-          relevantContext: `Previous query: ${turn.query.text}`
+          relevantContext: `Previous query: ${turn.query.originalText}`
         });
       }
-      if (turn.query.text.toLowerCase().includes('component')) {
+      if (turn.query.originalText.toLowerCase().includes('component')) {
         suggestions.push({
           type: 'related',
           suggestion: 'Show me the connections for this component',
-          relevantContext: `Related to: ${turn.query.text}`
+          relevantContext: `Related to: ${turn.query.originalText}`
         });
       }
     }

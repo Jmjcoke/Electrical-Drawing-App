@@ -227,11 +227,19 @@ export class SymbolDetectionStorageService {
     progressStage?: string,
     progressPercent?: number
   ): Promise<void> {
-    await this.repository.updateDetectionJob(jobId, {
-      status,
-      progressStage,
-      progressPercent
-    });
+    const updates: Partial<Pick<DetectionJob, 'status' | 'progressStage' | 'progressPercent'>> = {
+      status
+    };
+    
+    if (progressStage !== undefined) {
+      updates.progressStage = progressStage;
+    }
+    
+    if (progressPercent !== undefined) {
+      updates.progressPercent = progressPercent;
+    }
+    
+    await this.repository.updateDetectionJob(jobId, updates);
   }
 
   /**

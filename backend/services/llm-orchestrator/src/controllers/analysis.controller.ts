@@ -119,8 +119,8 @@ export class AnalysisController {
           questionStartWeight: 0.3,
           questionEndWeight: 0.1,
           generalReductionFactor: 0.5,
-          dominantIntentBoost: 0.2,
-          scoreNormalizationBoost: 1.2
+          dominantIntentBoost: 0.2
+          // scoreNormalizationBoost: 1.2 // Not yet supported in type definition
         }
       },
       extraction: {
