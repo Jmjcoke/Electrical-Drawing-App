@@ -412,7 +412,7 @@ export class ContextABTestingService {
     return {
       isSignificant,
       confidence,
-      winningVariant: winningVariant || undefined
+      winningVariant
     };
   }
 

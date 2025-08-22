@@ -2,6 +2,13 @@
  * LLM Orchestrator Service - Main Application
  */
 
+// Setup module aliases for runtime
+import 'module-alias/register';
+import * as moduleAlias from 'module-alias';
+
+moduleAlias.addAlias('@', __dirname);
+moduleAlias.addAlias('@/types', __dirname + '/../shared/types');
+
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -15,9 +22,26 @@ import { Pool } from 'pg';
 import { AnalysisController } from './controllers/analysis.controller';
 import { ContextChatController } from './controllers/context-chat.controller';
 import { SymbolDetectionController } from './controllers/symbol-detection.controller';
+import { ComponentController } from './controllers/component.controller';
+import { ExportController } from './controllers/export.controller';
 import { SymbolDetectionService } from './detection/symbol-detector';
+import { RealSymbolDetectionService } from './detection/symbol-detector-real';
+import { SymbolDetectionStorageService } from './services/symbol-detection-storage.service';
+import { ComponentExportService } from './export/component-export.service';
+import { TemplateService } from './export/template.service';
+import { ReportGeneratorService } from './export/report-generator.service';
+import { ExportRepository } from './repositories/export.repository';
+import { ComponentRepository } from './repositories/component.repository';
+import { SymbolDetectionRepository } from './repositories/symbol-detection.repository';
+import { CrossPageReferenceRepository } from './repositories/cross-page-reference.repository';
 import { contextWebSocketService } from './websocket/context-websocket.service';
 import { SymbolDetectionWebSocketEvents } from '../../../shared/types/symbol-detection.types';
+import { 
+  createExportRateLimiter, 
+  createDownloadRateLimiter, 
+  createPreviewRateLimiter, 
+  createTemplateRateLimiter 
+} from './middleware/export-rate-limiter';
 
 // Load environment variables
 dotenv.config();
@@ -84,7 +108,38 @@ const redisConfig = {
   ...(process.env.REDIS_PASSWORD && { password: process.env.REDIS_PASSWORD }),
 };
 
-const symbolDetectionService = new SymbolDetectionService(redisConfig, database);
+// Use real CV implementation if enabled, otherwise use mock
+const useRealCV = process.env.USE_REAL_CV === 'true';
+const symbolDetectionService: SymbolDetectionService | RealSymbolDetectionService = useRealCV 
+  ? new RealSymbolDetectionService(redisConfig, database)
+  : new SymbolDetectionService(redisConfig, database);
+
+if (useRealCV) {
+  console.log('🔬 Using REAL computer vision implementation for symbol detection');
+} else {
+  console.log('🎭 Using mock implementation for symbol detection (set USE_REAL_CV=true for real CV)');
+}
+
+// Initialize Symbol Detection Storage Service
+const symbolDetectionStorageService = new SymbolDetectionStorageService(database);
+
+// Initialize repositories for export service
+const exportRepository = new ExportRepository(database);
+const componentRepository = new ComponentRepository(database);
+const symbolDetectionRepository = new SymbolDetectionRepository(database);
+const crossPageReferenceRepository = new CrossPageReferenceRepository(database);
+
+// Initialize export services
+const reportGeneratorService = new ReportGeneratorService();
+const templateService = new TemplateService(exportRepository);
+const componentExportService = new ComponentExportService(
+  componentRepository,
+  symbolDetectionRepository,
+  crossPageReferenceRepository,
+  exportRepository,
+  reportGeneratorService,
+  templateService
+);
 
 // Security middleware
 app.use(helmet());
@@ -127,6 +182,12 @@ app.use((req, _res, next) => {
 const analysisController = new AnalysisController();
 const contextChatController = new ContextChatController();
 const symbolDetectionController = new SymbolDetectionController(symbolDetectionService);
+const componentController = new ComponentController(database, symbolDetectionStorageService);
+const exportController = new ExportController(
+  componentExportService,
+  templateService,
+  exportRepository
+);
 
 // API Routes
 // Image analysis routes
@@ -165,6 +226,63 @@ app.get('/api/v1/symbol-library', symbolDetectionController.getSymbolLibrary);
 app.post('/api/v1/symbol-library/validate', symbolDetectionController.validateCustomSymbol);
 app.get('/api/v1/detection-queue/stats', symbolDetectionController.getQueueStatistics);
 
+// Component Database routes
+app.get('/api/v1/components/library', componentController.searchComponents);
+app.get('/api/v1/components/:componentId', componentController.getComponent);
+app.post('/api/v1/components/library', componentController.createComponent);
+app.put('/api/v1/components/:componentId', componentController.updateComponent);
+app.delete('/api/v1/components/:componentId', componentController.deleteComponent);
+app.get('/api/v1/components/:componentId/properties', componentController.getComponentProperties);
+app.get('/api/v1/components/:componentId/ratings', componentController.getComponentRatings);
+app.get('/api/v1/components/:componentId/cross-references', componentController.getComponentCrossReferences);
+app.post('/api/v1/components/identify', componentController.identifyComponent);
+app.post('/api/v1/components/identify/batch', componentController.identifyBatchComponents);
+app.get('/api/v1/components/search/part-number/:partNumber', componentController.searchByPartNumber);
+app.get('/api/v1/components/search/manufacturer/:manufacturer', componentController.searchByManufacturer);
+app.get('/api/v1/components/standards/:standard', componentController.getComponentsByStandard);
+app.get('/api/v1/components/statistics', componentController.getLibraryStatistics);
+app.get('/api/v1/components/:componentId/similar', componentController.findSimilarComponents);
+app.get('/api/v1/components/properties/:propertyName/ranges', componentController.getPropertyValueRanges);
+app.post('/api/v1/components/suggest', componentController.suggestComponents);
+app.get('/api/v1/components/identification/statistics', componentController.getIdentificationStatistics);
+
+// Initialize export rate limiters
+const exportRateLimiter = createExportRateLimiter();
+const downloadRateLimiter = createDownloadRateLimiter();
+const previewRateLimiter = createPreviewRateLimiter();
+const templateRateLimiter = createTemplateRateLimiter();
+
+// Export and Reporting routes with rate limiting
+app.post('/api/sessions/:sessionId/export/components', 
+  exportRateLimiter.middleware(),
+  exportController.exportComponents.bind(exportController));
+app.get('/api/sessions/:sessionId/reports', 
+  exportController.getSessionReports.bind(exportController));
+app.get('/api/sessions/:sessionId/reports/:reportId', 
+  exportController.getReport.bind(exportController));
+app.get('/api/sessions/:sessionId/reports/:reportId/download', 
+  downloadRateLimiter.middleware(),
+  exportController.downloadReport.bind(exportController));
+app.post('/api/sessions/:sessionId/export/preview', 
+  previewRateLimiter.middleware(),
+  exportController.generatePreview.bind(exportController));
+app.get('/api/export/templates', 
+  templateRateLimiter.middleware(),
+  exportController.getTemplates.bind(exportController));
+app.post('/api/export/templates', 
+  templateRateLimiter.middleware(),
+  exportController.createTemplate.bind(exportController));
+app.get('/api/export/formats', 
+  exportController.getExportFormats.bind(exportController));
+app.get('/api/export/statistics', 
+  exportController.getExportStatistics.bind(exportController));
+app.get('/api/export/health',
+  exportController.getExportHealth.bind(exportController));
+app.get('/api/export/metrics',
+  exportController.getExportMetrics.bind(exportController));
+app.post('/api/export/alerts/:alertId/resolve',
+  exportController.resolveAlert.bind(exportController));
+
 // System health
 app.get('/api/v1/health', analysisController.healthCheck);
 
@@ -197,6 +315,33 @@ app.get('/', (_req, res) => {
       'GET /api/v1/symbol-library',
       'POST /api/v1/symbol-library/validate',
       'GET /api/v1/detection-queue/stats',
+      'GET /api/v1/components/library',
+      'GET /api/v1/components/:componentId',
+      'POST /api/v1/components/library',
+      'PUT /api/v1/components/:componentId',
+      'DELETE /api/v1/components/:componentId',
+      'GET /api/v1/components/:componentId/properties',
+      'GET /api/v1/components/:componentId/ratings',
+      'GET /api/v1/components/:componentId/cross-references',
+      'POST /api/v1/components/identify',
+      'POST /api/v1/components/identify/batch',
+      'GET /api/v1/components/search/part-number/:partNumber',
+      'GET /api/v1/components/search/manufacturer/:manufacturer',
+      'GET /api/v1/components/standards/:standard',
+      'GET /api/v1/components/statistics',
+      'GET /api/v1/components/:componentId/similar',
+      'GET /api/v1/components/properties/:propertyName/ranges',
+      'POST /api/v1/components/suggest',
+      'GET /api/v1/components/identification/statistics',
+      'POST /api/sessions/:sessionId/export/components',
+      'GET /api/sessions/:sessionId/reports',
+      'GET /api/sessions/:sessionId/reports/:reportId',
+      'GET /api/sessions/:sessionId/reports/:reportId/download',
+      'POST /api/sessions/:sessionId/export/preview',
+      'GET /api/export/templates',
+      'POST /api/export/templates',
+      'GET /api/export/formats',
+      'GET /api/export/statistics',
       'GET /api/v1/health',
     ]
   });

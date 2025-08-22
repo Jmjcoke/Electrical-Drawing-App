@@ -591,4 +591,61 @@ export class SymbolDetectionRepository {
     const match = queryId.match(/session-([^-]+)-/);
     return match ? match[1] : queryId;
   }
+
+  /**
+   * Get detected symbols by session ID for export
+   */
+  async getSymbolsBySession(sessionId: string, documentIds?: string[]): Promise<any[]> {
+    try {
+      let query = `
+        SELECT 
+          ds.id,
+          ds.document_id,
+          ds.page_number,
+          ds.symbol_type as type,
+          ds.symbol_label as label,
+          ds.confidence,
+          ds.bounding_box,
+          ds.zone,
+          ds.metadata
+        FROM electrical_analysis.detected_symbols ds
+        JOIN electrical_analysis.symbol_detection_results sdr ON ds.detection_result_id = sdr.id
+        WHERE sdr.session_id = $1
+      `;
+
+      const params: any[] = [sessionId];
+
+      if (documentIds && documentIds.length > 0) {
+        query += ` AND ds.document_id = ANY($2)`;
+        params.push(documentIds);
+      }
+
+      query += ` ORDER BY ds.page_number, ds.bounding_box->>'y'`;
+
+      const result = await this.db.query(query, params);
+
+      return result.rows.map(row => ({
+        id: row.id,
+        documentId: row.document_id,
+        pageNumber: row.page_number,
+        type: row.type,
+        label: row.label,
+        confidence: row.confidence,
+        boundingBox: {
+          x: row.bounding_box.x,
+          y: row.bounding_box.y,
+          width: row.bounding_box.width,
+          height: row.bounding_box.height
+        },
+        zone: row.zone,
+        metadata: row.metadata
+      }));
+    } catch (error) {
+      throw new SymbolDetectionError(
+        'Failed to get symbols by session',
+        'DATABASE_FETCH_ERROR',
+        { originalError: error, sessionId }
+      );
+    }
+  }
 }

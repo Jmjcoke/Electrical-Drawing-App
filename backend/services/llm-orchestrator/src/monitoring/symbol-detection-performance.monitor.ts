@@ -6,7 +6,7 @@
  */
 
 import { EventEmitter } from 'events';
-import { SymbolDetectionResult, DetectedSymbol, DetectionMetadata } from '../../../../shared/types/symbol-detection.types';
+import { SymbolDetectionResult, DetectionMetadata } from '../../../../shared/types/symbol-detection.types';
 
 export interface PerformanceMetrics {
   totalProcessingTime: number;
@@ -303,7 +303,13 @@ export class SymbolDetectionPerformanceMonitor extends EventEmitter {
   getPerformanceStats(): {
     current: PerformanceMetrics | null;
     average: Partial<PerformanceMetrics>;
-    session: typeof this.currentSession;
+    session: {
+      startTime: number;
+      totalProcessed: number;
+      cacheHits: number;
+      cacheMisses: number;
+      errors: number;
+    };
     cacheStats: {
       imageCache: { size: number; hitRate: number };
       resultCache: { size: number; hitRate: number };

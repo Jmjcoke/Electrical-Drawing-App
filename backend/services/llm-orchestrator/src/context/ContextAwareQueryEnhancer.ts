@@ -443,7 +443,7 @@ export class ContextAwareQueryEnhancer {
       if (turn) {
         contextSources.push({
           type: 'previous_query',
-          content: `Query: ${turn.query.text} | Response: ${turn.response.summary || ''}`,
+          content: `Query: ${turn.query.originalText} | Response: ${turn.response.summary || ''}`,
           relevance: score.combinedScore,
           turnId: turn.id
         });
@@ -707,7 +707,7 @@ export class ContextAwareQueryEnhancer {
     const recentTurns = context.conversationThread.slice(-3);
     for (const turn of recentTurns) {
       const entityMentions = Array.from(context.cumulativeContext.extractedEntities.keys())
-        .filter(entity => turn.query.text.toLowerCase().includes(entity.toLowerCase()) ||
+        .filter(entity => turn.query.originalText.toLowerCase().includes(entity.toLowerCase()) ||
                          (turn.response.summary && turn.response.summary.toLowerCase().includes(entity.toLowerCase())));
       
       resolutions.push(...entityMentions);

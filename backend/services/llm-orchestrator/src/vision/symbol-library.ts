@@ -9,7 +9,6 @@
 import { 
   ElectricalSymbolType,
   SymbolCategory,
-  Point,
   ImageProcessingError
 } from '../../../../shared/types/symbol-detection.types';
 import { v4 as uuidv4 } from 'uuid';
@@ -419,7 +418,7 @@ export class SymbolLibrary {
         drawFunction: (ctx, w, h) => {
           const centerY = h / 2;
           const coilWidth = w * 0.6;
-          const coilHeight = h * 0.4;
+          // const coilHeight = h * 0.4; // Reserved for future use
           const startX = (w - coilWidth) / 2;
           const coils = 4;
           

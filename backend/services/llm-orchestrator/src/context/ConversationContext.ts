@@ -11,7 +11,8 @@ import type {
   ProcessedQuery,
   AnalysisResult,
   ContextStorageConfig,
-  ContextValidationResult
+  ContextValidationResult,
+  EntityMention
 } from '../../../../shared/types/context';
 
 export class ConversationContextService {
@@ -300,13 +301,13 @@ export class ConversationContextService {
     turn.query.entities.forEach(entity => {
       const key = `${entity.type}:${entity.text}`;
       const existing = updated.extractedEntities.get(key) || [];
-      const newMention = {
+      const newMention: EntityMention = {
         text: entity.text,
         type: entity.type,
         confidence: entity.confidence,
         context: turn.query.originalText,
         turnId: turn.id,
-        position: entity.position || 0,
+        position: entity.position ? entity.position.start : 0,
         firstMentioned: existing.length > 0 ? existing[0].firstMentioned : turn.timestamp,
         mentions: existing.length + 1
       };

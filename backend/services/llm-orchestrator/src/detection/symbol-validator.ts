@@ -66,11 +66,15 @@ export class SymbolValidator {
     imageBuffer: Buffer
   ): Promise<number> {
     try {
+      // Get actual image dimensions from the buffer
+      const sharp = await import('sharp');
+      const metadata = await sharp.default(imageBuffer).metadata();
+      
       const context: ValidationContext = {
         allSymbols,
         imageBuffer,
-        imageWidth: 800, // Mock dimensions
-        imageHeight: 600,
+        imageWidth: metadata.width || symbol.location.imageWidth || 800,
+        imageHeight: metadata.height || symbol.location.imageHeight || 600,
         pageNumber: symbol.location.pageNumber,
       };
 

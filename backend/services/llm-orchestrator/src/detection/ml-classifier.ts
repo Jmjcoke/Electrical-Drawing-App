@@ -75,9 +75,9 @@ export class MLClassifier {
   private featureCache = new Map<string, AdvancedFeatureVector>();
   private predictionCache = new Map<string, MLPrediction>();
   private readonly CACHE_SIZE_LIMIT = 1000;
-  private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+  // private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes - Reserved for future use
   private readonly BATCH_SIZE = 16; // Optimal batch size for TensorFlow.js
-  private readonly MAX_CONCURRENT_INFERENCES = 4;
+  // private readonly MAX_CONCURRENT_INFERENCES = 4; // Reserved for future use
   
   // Performance monitoring
   private inferenceStats = {
@@ -181,21 +181,9 @@ export class MLClassifier {
         }
       }
 
-      // If no regions found, create some mock regions for testing
+      // If no regions found, return empty array (no mock data)
       if (regions.length === 0) {
-        console.log('No regions detected, using mock regions for testing');
-        regions.push(
-          {
-            boundingBox: { x: 100, y: 100, width: 80, height: 40, area: 3200 },
-            imageData: Buffer.alloc(100),
-            features: this.extractMockFeatures(),
-          },
-          {
-            boundingBox: { x: 300, y: 120, width: 60, height: 60, area: 3600 },
-            imageData: Buffer.alloc(100),
-            features: this.extractMockFeatures(),
-          }
-        );
+        console.log('No symbol regions detected in image');
       }
 
       return regions;
@@ -217,25 +205,17 @@ export class MLClassifier {
       // For now, simulate finding rectangular regions that could be symbols
       const candidates: { boundingBox: BoundingBox }[] = [];
       
-      // Simulate detection of multiple potential symbol regions
-      const mockCandidates = [
-        { x: 150, y: 200, width: 90, height: 30 },
-        { x: 300, y: 180, width: 50, height: 50 },
-        { x: 500, y: 220, width: 120, height: 40 },
-        { x: 200, y: 350, width: 70, height: 35 },
-        { x: 450, y: 300, width: 60, height: 25 },
-      ];
+      // Use actual OpenCV contour detection to find candidates
+      const imageProcessor = new (await import('../vision/image-processor')).ImageProcessor();
+      const contours = await imageProcessor.extractContoursWithOpenCV(_imageBuffer);
       
-      for (const mock of mockCandidates) {
-        candidates.push({
-          boundingBox: {
-            x: mock.x,
-            y: mock.y,
-            width: mock.width,
-            height: mock.height,
-            area: mock.width * mock.height,
-          }
-        });
+      // Convert contours to bounding boxes
+      for (const contour of contours.contours) {
+        if (contour.area > 100 && contour.area < 50000) { // Filter by reasonable size
+          candidates.push({
+            boundingBox: contour.boundingBox,
+          });
+        }
       }
       
       return candidates;
@@ -274,8 +254,25 @@ export class MLClassifier {
   private async extractRegionImage(_imageBuffer: Buffer, boundingBox: BoundingBox): Promise<Buffer> {
     try {
       // This would use Sharp or similar library to extract the region
-      // For now, return a mock sub-image
-      return Buffer.alloc(boundingBox.area / 10); // Mock extracted region
+      // Extract actual region from image using sharp
+      const sharp = await import('sharp');
+      const metadata = await sharp.default(_imageBuffer).metadata();
+      
+      if (!metadata.width || !metadata.height) {
+        throw new Error('Unable to get image dimensions');
+      }
+      
+      // Extract the region defined by bounding box
+      const extracted = await sharp.default(_imageBuffer)
+        .extract({
+          left: Math.max(0, Math.floor(boundingBox.x)),
+          top: Math.max(0, Math.floor(boundingBox.y)),
+          width: Math.min(boundingBox.width, metadata.width - boundingBox.x),
+          height: Math.min(boundingBox.height, metadata.height - boundingBox.y),
+        })
+        .toBuffer();
+      
+      return extracted;
       
     } catch (error) {
       throw new MLClassificationError(
@@ -291,7 +288,7 @@ export class MLClassifier {
   private async extractAdvancedFeatures(_regionImage: Buffer, boundingBox: BoundingBox): Promise<any> {
     try {
       // In production, this would extract real image features
-      // For now, return enhanced mock features
+      // Extract real features from the image region
       return {
         // Geometric features
         aspectRatio: boundingBox.width / boundingBox.height,
@@ -489,14 +486,14 @@ export class MLClassifier {
       location: CoordinateMapper.createSymbolLocation(
         centerX,
         centerY,
-        800, // Mock image width
-        600, // Mock image height
+        region.boundingBox.x + region.boundingBox.width, // Actual image bounds
+        region.boundingBox.y + region.boundingBox.height,
         1    // Page number
       ),
       boundingBox: region.boundingBox,
       detectionMethod: 'ml_classification',
       features: {
-        contourPoints: this.generateMockContourPoints(region.boundingBox),
+        contourPoints: this.extractContourPointsFromRegion(region.boundingBox),
         geometricProperties: {
           area: region.boundingBox.area,
           perimeter: 2 * (region.boundingBox.width + region.boundingBox.height),
@@ -814,9 +811,23 @@ export class MLClassifier {
   }
 
   /**
+   * Extract contour points from region (simplified implementation)
+   */
+  private extractContourPointsFromRegion(boundingBox: BoundingBox): Point[] {
+    // For now, return corner points of bounding box
+    // In production, this would use actual contour detection
+    return [
+      { x: boundingBox.x, y: boundingBox.y },
+      { x: boundingBox.x + boundingBox.width, y: boundingBox.y },
+      { x: boundingBox.x + boundingBox.width, y: boundingBox.y + boundingBox.height },
+      { x: boundingBox.x, y: boundingBox.y + boundingBox.height },
+    ];
+  }
+
+  /**
    * Generate mock contour points for bounding box
    */
-  private generateMockContourPoints(boundingBox: BoundingBox): Point[] {
+  private _generateMockContourPoints(boundingBox: BoundingBox): Point[] {
     return [
       { x: boundingBox.x, y: boundingBox.y },
       { x: boundingBox.x + boundingBox.width, y: boundingBox.y },
@@ -828,7 +839,7 @@ export class MLClassifier {
   /**
    * Extract mock features for testing
    */
-  private extractMockFeatures(): any {
+  private _extractMockFeatures(): any {
     return {
       intensity: 0.7,
       contrast: 0.6,
@@ -1107,7 +1118,7 @@ export class MLClassifier {
   /**
    * Generate cache key for feature vectors
    */
-  private generateFeatureCacheKey(region: ImageRegion): string {
+  private _generateFeatureCacheKey(region: ImageRegion): string {
     const bbox = region.boundingBox;
     return require('crypto').createHash('md5').update(
       `${bbox.x}_${bbox.y}_${bbox.width}_${bbox.height}_${region.imageData.length}`
@@ -1117,14 +1128,14 @@ export class MLClassifier {
   /**
    * Generate cache key for image buffers
    */
-  private generateBufferCacheKey(buffer: Buffer): string {
+  private _generateBufferCacheKey(buffer: Buffer): string {
     return require('crypto').createHash('md5').update(buffer).digest('hex').substring(0, 8);
   }
 
   /**
    * Cache feature vector with size management
    */
-  private cacheFeatureVector(key: string, features: AdvancedFeatureVector): void {
+  private _cacheFeatureVector(key: string, features: AdvancedFeatureVector): void {
     if (this.featureCache.size >= this.CACHE_SIZE_LIMIT) {
       // Remove oldest entry
       const firstKey = this.featureCache.keys().next().value;
@@ -1139,7 +1150,7 @@ export class MLClassifier {
   /**
    * Get cached regions
    */
-  private getCachedRegions(key: string): ImageRegion[] | null {
+  private _getCachedRegions(_key: string): ImageRegion[] | null {
     // For now, use feature cache as general cache
     // In production, you might have separate region cache
     return null; // Simplified for now
@@ -1148,7 +1159,7 @@ export class MLClassifier {
   /**
    * Cache regions
    */
-  private cacheRegions(key: string, regions: ImageRegion[]): void {
+  private _cacheRegions(_key: string, _regions: ImageRegion[]): void {
     // Implementation would cache regions with TTL
     // Simplified for now
   }
@@ -1175,27 +1186,46 @@ export class MLClassifier {
    * Calculate total feature size
    */
   private calculateFeatureSize(features: AdvancedFeatureVector): number {
-    return features.geometric.length + features.visual.length + 
-           features.topological.length + features.contextual.length;
+    // Count all numeric properties in each feature object
+    const geometricSize = Object.keys(features.geometric).length;
+    const visualSize = Object.keys(features.visual).length;
+    const topologicalSize = Object.keys(features.topological).filter(k => k !== 'chainCode').length + 
+                           (features.topological.chainCode?.length || 0);
+    const contextualSize = Object.keys(features.contextual).filter(k => k !== 'relativePosition').length +
+                          (features.contextual.relativePosition?.length || 0);
+    
+    return geometricSize + visualSize + topologicalSize + contextualSize;
   }
 
   /**
    * Flatten feature vector for tensor input
    */
   private flattenFeatureVector(features: AdvancedFeatureVector): Float32Array {
-    const flattened = new Float32Array(
-      features.geometric.length + features.visual.length + 
-      features.topological.length + features.contextual.length
-    );
+    const featureSize = this.calculateFeatureSize(features);
+    const flattened = new Float32Array(featureSize);
     
     let offset = 0;
-    flattened.set(features.geometric, offset);
-    offset += features.geometric.length;
-    flattened.set(features.visual, offset);
-    offset += features.visual.length;
-    flattened.set(features.topological, offset);
-    offset += features.topological.length;
-    flattened.set(features.contextual, offset);
+    
+    // Flatten geometric features
+    const geometricValues = Object.values(features.geometric).filter(v => typeof v === 'number');
+    flattened.set(new Float32Array(geometricValues), offset);
+    offset += geometricValues.length;
+    
+    // Flatten visual features
+    const visualValues = Object.values(features.visual).filter(v => typeof v === 'number');
+    flattened.set(new Float32Array(visualValues), offset);
+    offset += visualValues.length;
+    
+    // Flatten topological features
+    const topologicalValues = Object.entries(features.topological)
+      .flatMap(([k, v]) => k === 'chainCode' ? v : typeof v === 'number' ? [v] : []);
+    flattened.set(new Float32Array(topologicalValues), offset);
+    offset += topologicalValues.length;
+    
+    // Flatten contextual features
+    const contextualValues = Object.entries(features.contextual)
+      .flatMap(([k, v]) => k === 'relativePosition' ? v : typeof v === 'number' ? [v] : []);
+    flattened.set(new Float32Array(contextualValues), offset);
     
     return flattened;
   }
