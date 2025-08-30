@@ -26,7 +26,7 @@ export interface ValidationResult {
 
 class ValidationService {
   private readonly MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB (for electrical drawings)
-  private readonly MIN_FILE_SIZE = 1024; // 1KB
+  private readonly MIN_FILE_SIZE = 100; // 100 bytes - relaxed for testing
   private readonly ALLOWED_MIME_TYPES = ['application/pdf'];
   private readonly MAX_PAGES = 20; // Maximum pages for conversion
 

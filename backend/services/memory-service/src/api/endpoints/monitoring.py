@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from typing import Dict, Any, List
 import logging
 
-from ...core.graphiti_client import GraphitiClient
+from core.graphiti_client import GraphitiClient
 from ..dependencies import get_graphiti_client
 
 logger = logging.getLogger(__name__)

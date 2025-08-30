@@ -13,7 +13,7 @@ from ..models.memory_models import (
     MemorySearchRequest,
     MemorySearchResponse
 )
-from ...core.graphiti_client import GraphitiClient
+from core.graphiti_client import GraphitiClient
 from ..dependencies import get_graphiti_client
 
 logger = logging.getLogger(__name__)

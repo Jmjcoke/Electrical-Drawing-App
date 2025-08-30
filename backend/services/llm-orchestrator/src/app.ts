@@ -21,21 +21,15 @@ import { Server } from 'socket.io';
 import { Pool } from 'pg';
 import { AnalysisController } from './controllers/analysis.controller';
 import { ContextChatController } from './controllers/context-chat.controller';
-import { SymbolDetectionController } from './controllers/symbol-detection.controller';
 import { ComponentController } from './controllers/component.controller';
 import { ExportController } from './controllers/export.controller';
-import { SymbolDetectionService } from './detection/symbol-detector';
-import { RealSymbolDetectionService } from './detection/symbol-detector-real';
-import { SymbolDetectionStorageService } from './services/symbol-detection-storage.service';
 import { ComponentExportService } from './export/component-export.service';
 import { TemplateService } from './export/template.service';
 import { ReportGeneratorService } from './export/report-generator.service';
 import { ExportRepository } from './repositories/export.repository';
 import { ComponentRepository } from './repositories/component.repository';
-import { SymbolDetectionRepository } from './repositories/symbol-detection.repository';
 import { CrossPageReferenceRepository } from './repositories/cross-page-reference.repository';
 import { contextWebSocketService } from './websocket/context-websocket.service';
-import { SymbolDetectionWebSocketEvents } from '../../../shared/types/symbol-detection.types';
 import { 
   createExportRateLimiter, 
   createDownloadRateLimiter, 
@@ -108,25 +102,10 @@ const redisConfig = {
   ...(process.env.REDIS_PASSWORD && { password: process.env.REDIS_PASSWORD }),
 };
 
-// Use real CV implementation if enabled, otherwise use mock
-const useRealCV = process.env.USE_REAL_CV === 'true';
-const symbolDetectionService: SymbolDetectionService | RealSymbolDetectionService = useRealCV 
-  ? new RealSymbolDetectionService(redisConfig, database)
-  : new SymbolDetectionService(redisConfig, database);
-
-if (useRealCV) {
-  console.log('🔬 Using REAL computer vision implementation for symbol detection');
-} else {
-  console.log('🎭 Using mock implementation for symbol detection (set USE_REAL_CV=true for real CV)');
-}
-
-// Initialize Symbol Detection Storage Service
-const symbolDetectionStorageService = new SymbolDetectionStorageService(database);
 
 // Initialize repositories for export service
 const exportRepository = new ExportRepository(database);
 const componentRepository = new ComponentRepository(database);
-const symbolDetectionRepository = new SymbolDetectionRepository(database);
 const crossPageReferenceRepository = new CrossPageReferenceRepository(database);
 
 // Initialize export services
@@ -134,7 +113,6 @@ const reportGeneratorService = new ReportGeneratorService();
 const templateService = new TemplateService(exportRepository);
 const componentExportService = new ComponentExportService(
   componentRepository,
-  symbolDetectionRepository,
   crossPageReferenceRepository,
   exportRepository,
   reportGeneratorService,
@@ -181,8 +159,7 @@ app.use((req, _res, next) => {
 // Initialize controllers
 const analysisController = new AnalysisController();
 const contextChatController = new ContextChatController();
-const symbolDetectionController = new SymbolDetectionController(symbolDetectionService);
-const componentController = new ComponentController(database, symbolDetectionStorageService);
+const componentController = new ComponentController(database);
 const exportController = new ExportController(
   componentExportService,
   templateService,
@@ -207,24 +184,7 @@ app.get('/api/v1/context/history/:sessionId', contextChatController.getConversat
 app.delete('/api/v1/context/reset/:sessionId', contextChatController.resetConversationContext);
 app.get('/api/v1/context/health/:sessionId?', contextChatController.getContextHealth);
 
-// Symbol Detection routes
-app.post('/api/v1/sessions/:sessionId/documents/:documentId/detect-symbols', 
-  upload.single('pdf'), symbolDetectionController.startDetection);
-app.get('/api/v1/sessions/:sessionId/detection-results/:resultId', 
-  symbolDetectionController.getDetectionResult);
-app.get('/api/v1/sessions/:sessionId/detection-results', 
-  symbolDetectionController.listDetectionResults);
-app.get('/api/v1/sessions/:sessionId/detection-jobs/:jobId/status', 
-  symbolDetectionController.getJobStatus);
-app.delete('/api/v1/sessions/:sessionId/detection-jobs/:jobId', 
-  symbolDetectionController.cancelDetection);
-app.put('/api/v1/sessions/:sessionId/detection-results/:resultId/validate', 
-  symbolDetectionController.validateDetectionResult);
-app.delete('/api/v1/sessions/:sessionId/detection-results/:resultId', 
-  symbolDetectionController.deleteDetectionResult);
-app.get('/api/v1/symbol-library', symbolDetectionController.getSymbolLibrary);
-app.post('/api/v1/symbol-library/validate', symbolDetectionController.validateCustomSymbol);
-app.get('/api/v1/detection-queue/stats', symbolDetectionController.getQueueStatistics);
+// Enhanced context chat routes with spatial awareness
 
 // Component Database routes
 app.get('/api/v1/components/library', componentController.searchComponents);
@@ -305,16 +265,6 @@ app.get('/', (_req, res) => {
       'GET /api/v1/context/history/:sessionId',
       'DELETE /api/v1/context/reset/:sessionId',
       'GET /api/v1/context/health/:sessionId?',
-      'POST /api/v1/sessions/:sessionId/documents/:documentId/detect-symbols',
-      'GET /api/v1/sessions/:sessionId/detection-results/:resultId',
-      'GET /api/v1/sessions/:sessionId/detection-results',
-      'GET /api/v1/sessions/:sessionId/detection-jobs/:jobId/status',
-      'DELETE /api/v1/sessions/:sessionId/detection-jobs/:jobId',
-      'PUT /api/v1/sessions/:sessionId/detection-results/:resultId/validate',
-      'DELETE /api/v1/sessions/:sessionId/detection-results/:resultId',
-      'GET /api/v1/symbol-library',
-      'POST /api/v1/symbol-library/validate',
-      'GET /api/v1/detection-queue/stats',
       'GET /api/v1/components/library',
       'GET /api/v1/components/:componentId',
       'POST /api/v1/components/library',
@@ -347,76 +297,15 @@ app.get('/', (_req, res) => {
   });
 });
 
-// Setup WebSocket event handlers for symbol detection
+// Setup WebSocket event handlers
 io.on('connection', (socket) => {
-  console.log('Client connected for symbol detection:', socket.id);
-
-  // Handle symbol detection WebSocket events
-  socket.on('start-symbol-detection', async (data: SymbolDetectionWebSocketEvents['start-symbol-detection']) => {
-    try {
-      console.log('Symbol detection started via WebSocket:', data);
-      // This would typically be handled through the REST API
-      // WebSocket is primarily used for progress updates
-      socket.emit('symbol-detection-error', {
-        jobId: 'websocket-not-supported',
-        error: 'Symbol detection must be started via REST API, WebSocket used for progress updates only'
-      });
-    } catch (error) {
-      console.error('WebSocket symbol detection error:', error);
-      socket.emit('symbol-detection-error', {
-        jobId: data.sessionId,
-        error: 'Failed to start symbol detection'
-      });
-    }
-  });
-
-  socket.on('cancel-symbol-detection', async (data: SymbolDetectionWebSocketEvents['cancel-symbol-detection']) => {
-    try {
-      console.log('Symbol detection cancellation requested via WebSocket:', data);
-      const cancelled = await symbolDetectionService.cancelJob(data.detectionJobId);
-      if (cancelled) {
-        socket.emit('symbol-detection-error', {
-          jobId: data.detectionJobId,
-          error: 'Detection cancelled by user'
-        });
-      }
-    } catch (error) {
-      console.error('WebSocket symbol detection cancellation error:', error);
-      socket.emit('symbol-detection-error', {
-        jobId: data.detectionJobId,
-        error: 'Failed to cancel symbol detection'
-      });
-    }
-  });
+  console.log('Client connected:', socket.id);
 
   socket.on('disconnect', () => {
-    console.log('Client disconnected from symbol detection:', socket.id);
+    console.log('Client disconnected:', socket.id);
   });
 });
 
-// Forward symbol detection service events to WebSocket clients
-symbolDetectionService.on('detection-started', (data) => {
-  io.emit('symbol-detection-started', {
-    jobId: data.jobIds[0],
-    estimatedTime: data.estimatedTime
-  });
-});
-
-symbolDetectionService.on('detection-progress', (data) => {
-  io.emit('symbol-detection-progress', data);
-});
-
-symbolDetectionService.on('detection-completed', (data) => {
-  io.emit('symbol-detection-completed', data);
-});
-
-symbolDetectionService.on('detection-error', (data) => {
-  io.emit('symbol-detection-error', data);
-});
-
-symbolDetectionService.on('symbol-detected', (data) => {
-  io.emit('symbol-detected', data);
-});
 
 // Error handling middleware
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -502,8 +391,6 @@ const gracefulShutdown = async (signal: string) => {
   // Shutdown context WebSocket service first
   await contextWebSocketService.shutdown();
   
-  // Shutdown symbol detection service
-  await symbolDetectionService.shutdown();
   
   // Close database connections
   await database.end();

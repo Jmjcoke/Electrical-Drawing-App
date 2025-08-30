@@ -49,3 +49,20 @@ backend/services/file-processor/backend/storage/temp/
 # Package lock for nested dependencies
 **/node_modules/
 **/.package-lock.json
+
+logs
+dev-debug.log
+# Dependency directories
+# Editor directories and files
+.idea
+.vscode
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+# OS specific
+
+# Task files
+# tasks.json
+# tasks/ 

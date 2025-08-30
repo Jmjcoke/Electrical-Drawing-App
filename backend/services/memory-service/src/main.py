@@ -10,10 +10,10 @@ import uvicorn
 import logging
 from contextlib import asynccontextmanager
 
-from .api.router import api_router
-from .api.dependencies import set_graphiti_client
-from .core.config import settings
-from .core.graphiti_client import GraphitiClient
+from api.router import api_router
+from api.dependencies import set_graphiti_client
+from core.config import settings
+from core.graphiti_client import GraphitiClient
 
 # Configure logging
 logging.basicConfig(

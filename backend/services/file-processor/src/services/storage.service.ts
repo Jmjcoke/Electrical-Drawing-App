@@ -5,6 +5,7 @@ import Bull from 'bull';
 import Redis from 'ioredis';
 import { logger } from '../utils/logger.js';
 import { CleanupJob } from '../types/api.types.js';
+import { fileProcessorStorageIntegration } from '../integration/shared-storage.integration.js';
 
 export interface StoredFile {
   fileId: string;
@@ -149,6 +150,33 @@ class StorageService {
       };
 
       this.convertedImages.set(documentId, convertedImages);
+      
+      // Register with shared storage for cross-service access
+      try {
+        await fileProcessorStorageIntegration.registerSessionAccess(
+          sessionId, 
+          documentId, 
+          imagePaths
+        );
+
+        // Store conversion metadata for cross-service discovery
+        await fileProcessorStorageIntegration.storeConversionMetadata(
+          sessionId,
+          documentId,
+          imagePaths,
+          { totalSize, expiresAt: convertedImages.expiresAt }
+        );
+
+        // Create shared access manifest for service discovery
+        await fileProcessorStorageIntegration.createAccessManifest(sessionId);
+      } catch (sharedStorageError) {
+        // Log warning but don't fail the operation - maintain backward compatibility
+        logger.warn('Failed to register with shared storage - continuing with local storage only', {
+          documentId,
+          sessionId,
+          error: sharedStorageError instanceof Error ? sharedStorageError.message : String(sharedStorageError)
+        });
+      }
       
       logger.info('Stored converted images', {
         documentId,
@@ -514,10 +542,13 @@ class StorageService {
   /**
    * Get storage health status
    */
-  async getHealthStatus(): Promise<{ status: string; metrics: Record<string, number> }> {
+  async getHealthStatus(): Promise<{ status: string; metrics: Record<string, number>; sharedStorage?: any }> {
     try {
       const uploadsSize = await this.getDirectorySize(this.UPLOAD_DIR);
       const convertedSize = await this.getDirectorySize(path.join(this.STORAGE_BASE, 'sessions'));
+      
+      // Check shared storage integration health
+      const sharedStorageHealth = await fileProcessorStorageIntegration.healthCheck();
       
       return {
         status: 'healthy',
@@ -526,7 +557,8 @@ class StorageService {
           convertedSize,
           activeFiles: this.storedFiles.size,
           activeConversions: this.convertedImages.size
-        }
+        },
+        sharedStorage: sharedStorageHealth
       };
     } catch (error) {
       return {

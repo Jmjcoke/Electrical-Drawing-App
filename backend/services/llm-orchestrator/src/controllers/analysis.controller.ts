@@ -13,6 +13,7 @@ import { createSessionRateLimiter, createProviderRateLimiter } from '../utils/ra
 import { createCircuitBreaker } from '../utils/circuit-breaker';
 import { QueryProcessor } from '../nlp/QueryProcessor';
 import { SuggestionEngine } from '../nlp/SuggestionEngine';
+import { llmOrchestratorStorageIntegration } from '../integration/shared-storage.integration.js';
 import type { ProcessQueryRequest, GetSuggestionsRequest, NLPConfig } from '../../../../shared/types/nlp.types';
 // Local type definitions for LLM analysis
 export interface AnalysisRequest {
@@ -438,13 +439,16 @@ export class AnalysisController {
       const openaiHealth = await this.openaiProvider.healthCheck();
       const circuitBreakerMetrics = this.circuitBreaker.getMetrics();
       const rateLimitStats = this.sessionRateLimit.getStats();
-
       const nlpHealth = await this.queryProcessor.healthCheck();
+      
+      // Check shared storage integration health
+      const sharedStorageHealth = await llmOrchestratorStorageIntegration.healthCheck();
 
       const isHealthy = openaiHealth && 
                        circuitBreakerMetrics.state === 'CLOSED' &&
                        this.openaiProvider.validateConfiguration() &&
-                       nlpHealth.healthy;
+                       nlpHealth.healthy &&
+                       sharedStorageHealth.status === 'healthy';
 
       res.status(isHealthy ? 200 : 503).json({
         status: isHealthy ? 'healthy' : 'unhealthy',
@@ -453,8 +457,10 @@ export class AnalysisController {
           openai: openaiHealth ? 'connected' : 'disconnected',
           circuitBreaker: circuitBreakerMetrics.state.toLowerCase(),
           rateLimit: 'active',
-          nlp: nlpHealth.healthy ? 'healthy' : 'unhealthy'
+          nlp: nlpHealth.healthy ? 'healthy' : 'unhealthy',
+          sharedStorage: sharedStorageHealth.status
         },
+        sharedStorage: sharedStorageHealth,
         nlpComponents: nlpHealth.components,
         metrics: {
           totalAnalyses: circuitBreakerMetrics.totalRequests,
@@ -521,19 +527,45 @@ export class AnalysisController {
   }
 
   private async getDocumentImages(sessionId: string, documentId: string): Promise<string[]> {
-    // Based on Story 1.3's file storage structure: sessions/{session-id}/converted/{doc-id}/
+    try {
+      // Use shared storage integration for cross-service file access
+      const imageFiles = await llmOrchestratorStorageIntegration.accessConvertedImages(
+        sessionId, 
+        documentId
+      );
+
+      // Sort for consistent ordering
+      return imageFiles.sort();
+    } catch (error) {
+      console.error(`Error accessing converted images via shared storage:`, {
+        sessionId,
+        documentId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      
+      // Fallback to legacy direct file access if shared storage fails
+      console.warn('Falling back to legacy file access method');
+      return await this.getDocumentImagesLegacy(sessionId, documentId);
+    }
+  }
+
+  /**
+   * Legacy file access method as fallback
+   * Maintains backward compatibility
+   */
+  private async getDocumentImagesLegacy(sessionId: string, documentId: string): Promise<string[]> {
+    // Based on current file storage structure: sessions/{session-id}/converted_images/
     const convertedDir = path.join(
       process.cwd(),
-      'backend/services/file-processor/storage/sessions',
+      'backend/services/file-processor/backend/storage/sessions',
       sessionId,
-      'converted',
-      documentId
+      'converted_images'
     );
 
     try {
       const files = await fs.readdir(convertedDir);
       const imageFiles = files
-        .filter(file => /\.(png|jpg|jpeg)$/i.test(file))
+        .filter(file => /\.(png|jpg|jpeg|gif|bmp|webp|tiff)$/i.test(file))
         .sort() // Ensure consistent ordering
         .map(file => path.join(convertedDir, file));
 
