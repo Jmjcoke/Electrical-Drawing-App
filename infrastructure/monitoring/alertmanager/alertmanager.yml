@@ -1,0 +1,164 @@
+global:
+  smtp_smarthost: 'smtp.gmail.com:587'
+  smtp_from: 'alerts@shared-storage.com'
+  smtp_auth_username: 'alerts@shared-storage.com'
+  smtp_auth_password: 'your-smtp-password'
+
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+route:
+  group_by: ['alertname', 'service', 'severity']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 1h
+  receiver: 'shared-storage-team'
+  routes:
+    - match:
+        severity: critical
+        service: shared-storage
+      receiver: 'shared-storage-critical'
+      continue: true
+    - match:
+        alertname: SharedStorageServiceDown
+      receiver: 'shared-storage-pager'
+      continue: true
+    - match:
+        severity: warning
+      receiver: 'shared-storage-warning'
+      continue: true
+    - match:
+        alertname: SharedStorageLowAvailability
+      receiver: 'shared-storage-business'
+      continue: true
+
+receivers:
+  - name: 'shared-storage-critical'
+    slack_configs:
+      - api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+        channel: '#shared-storage-critical'
+        send_resolved: true
+        title: '🚨 {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Severity:* {{ .Labels.severity }}
+          *Service:* {{ .Labels.service }}
+          *Value:* {{ .Annotations.value }}
+          *Started:* {{ .StartsAt.Format "2006-01-02 15:04:05" }}
+          {{ if .Annotations.runbook_url }}*Runbook:* {{ .Annotations.runbook_url }}{{ end }}
+          ---
+          {{ end }}
+    pagerduty_configs:
+      - service_key: 'your-pagerduty-service-key'
+        send_resolved: true
+        description: '{{ .GroupLabels.alertname }}: {{ .CommonAnnotations.summary }}'
+        details:
+          severity: '{{ .Labels.severity }}'
+          service: '{{ .Labels.service }}'
+          value: '{{ .Annotations.value }}'
+          description: '{{ .Annotations.description }}'
+    email_configs:
+      - to: 'shared-storage-critical@company.com'
+        subject: '🚨 CRITICAL: {{ .GroupLabels.alertname }}'
+        body: |
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Severity: {{ .Labels.severity }}
+          Service: {{ .Labels.service }}
+          Value: {{ .Annotations.value }}
+          Started: {{ .StartsAt.Format "2006-01-02 15:04:05" }}
+
+          {{ if .Annotations.runbook_url }}Runbook: {{ .Annotations.runbook_url }}{{ end }}
+          {{ end }}
+
+  - name: 'shared-storage-pager'
+    pagerduty_configs:
+      - service_key: 'your-pagerduty-pager-key'
+        send_resolved: true
+        description: '{{ .GroupLabels.alertname }}: Service is DOWN'
+        severity: 'critical'
+
+  - name: 'shared-storage-warning'
+    slack_configs:
+      - api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+        channel: '#shared-storage-alerts'
+        send_resolved: true
+        title: '⚠️ {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Severity:* {{ .Labels.severity }}
+          *Service:* {{ .Labels.service }}
+          *Value:* {{ .Annotations.value }}
+          {{ if .Annotations.runbook_url }}*Runbook:* {{ .Annotations.runbook_url }}{{ end }}
+          ---
+          {{ end }}
+    email_configs:
+      - to: 'shared-storage-team@company.com'
+        subject: '⚠️ WARNING: {{ .GroupLabels.alertname }}'
+        body: |
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Severity: {{ .Labels.severity }}
+          Service: {{ .Labels.service }}
+          Value: {{ .Annotations.value }}
+          Started: {{ .StartsAt.Format "2006-01-02 15:04:05" }}
+
+          {{ if .Annotations.runbook_url }}Runbook: {{ .Annotations.runbook_url }}{{ end }}
+          {{ end }}
+
+  - name: 'shared-storage-business'
+    slack_configs:
+      - api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+        channel: '#business-impact'
+        send_resolved: true
+        title: '💼 {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Business Impact Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Business Impact:* {{ .Annotations.business_impact }}
+          *Severity:* {{ .Labels.severity }}
+          *Service:* {{ .Labels.service }}
+          *Value:* {{ .Annotations.value }}
+          *Started:* {{ .StartsAt.Format "2006-01-02 15:04:05" }}
+          {{ if .Annotations.runbook_url }}*Runbook:* {{ .Annotations.runbook_url }}{{ end }}
+          ---
+          {{ end }}
+    email_configs:
+      - to: 'business-stakeholders@company.com'
+        subject: '💼 BUSINESS IMPACT: {{ .GroupLabels.alertname }}'
+        body: |
+          {{ range .Alerts }}
+          Business Impact Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Business Impact: {{ .Annotations.business_impact }}
+          Severity: {{ .Labels.severity }}
+          Service: {{ .Labels.service }}
+          Value: {{ .Annotations.value }}
+          Started: {{ .StartsAt.Format "2006-01-02 15:04:05" }}
+
+          {{ if .Annotations.runbook_url }}Runbook: {{ .Annotations.runbook_url }}{{ end }}
+          {{ end }}
+
+  - name: 'shared-storage-team'
+    slack_configs:
+      - api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+        channel: '#shared-storage-team'
+        send_resolved: true
+        title: '📢 {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Severity:* {{ .Labels.severity }}
+          *Service:* {{ .Labels.service }}
+          {{ if .Annotations.value }}*Value:* {{ .Annotations.value }}{{ end }}
+          {{ if .Annotations.runbook_url }}*Runbook:* {{ .Annotations.runbook_url }}{{ end }}
+          ---
+          {{ end }}

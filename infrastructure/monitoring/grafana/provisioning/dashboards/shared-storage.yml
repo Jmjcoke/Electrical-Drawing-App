@@ -1,0 +1,18 @@
+apiVersion: 1
+
+providers:
+  - name: 'shared-storage'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/shared-storage
+
+  - name: 'shared-storage-default'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/shared-storage

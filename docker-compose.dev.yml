@@ -1,0 +1,104 @@
+version: '3.8'
+
+# Development override for docker-compose.yml
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  # File Processor - Development Configuration
+  file-processor:
+    build:
+      context: ./backend/services/file-processor
+      dockerfile: Dockerfile.dev
+      target: development
+    environment:
+      - NODE_ENV=development
+      - LOG_LEVEL=debug
+      - HOT_RELOAD=true
+      - DEBUG=electrical:*
+    volumes:
+      # Add source code volume for hot reload
+      - ./backend/services/file-processor/src:/app/src
+      - ./backend/shared:/app/shared
+      # Development session storage (host path for easier debugging)
+      - ./backend/services/file-processor/backend/storage/sessions:/app/storage/sessions
+      - ./backend/services/file-processor/uploads:/app/uploads
+    command: ["npm", "run", "dev"]
+
+  # LLM Orchestrator - Development Configuration
+  llm-orchestrator:
+    build:
+      context: ./backend/services/llm-orchestrator
+      dockerfile: Dockerfile.dev
+      target: development
+    environment:
+      - NODE_ENV=development
+      - LOG_LEVEL=debug
+      - HOT_RELOAD=true
+      - DEBUG=electrical:*
+      # Development API keys (use .env file)
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - CLAUDE_API_KEY=${CLAUDE_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    volumes:
+      # Add source code volume for hot reload
+      - ./backend/services/llm-orchestrator/src:/app/src
+      - ./backend/shared:/app/shared
+      # Development session storage (host path for easier debugging)
+      - ./backend/services/file-processor/backend/storage/sessions:/app/storage/sessions:ro
+    command: ["npm", "run", "dev"]
+
+  # Memory Service - Development Configuration  
+  memory-service:
+    environment:
+      - LOG_LEVEL=DEBUG
+      - DEVELOPMENT_MODE=true
+    volumes:
+      # Add source code volume for hot reload
+      - ./backend/services/memory-service/src:/app/src
+
+  # Database with development settings
+  postgres:
+    environment:
+      POSTGRES_DB: electrical_drawing_app_dev
+      POSTGRES_USER: dev_user
+      POSTGRES_PASSWORD: dev_password
+    ports:
+      - "5433:5432"  # Different port for development
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+
+  # Development tools
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: electrical_redis_commander
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    depends_on:
+      - redis
+    networks:
+      - electrical_network
+
+  # Adminer for database management
+  adminer:
+    image: adminer:latest
+    container_name: electrical_adminer
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+    networks:
+      - electrical_network
+    environment:
+      - ADMINER_DEFAULT_SERVER=postgres
+
+volumes:
+  postgres_dev_data:
+
+# Development-specific network configuration
+networks:
+  electrical_network:
+    driver: bridge

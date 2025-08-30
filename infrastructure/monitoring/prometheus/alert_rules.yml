@@ -1,0 +1,254 @@
+groups:
+  - name: shared_storage_service_alerts
+    rules:
+      # Service availability alerts
+      - alert: SharedStorageServiceDown
+        expr: up{job="shared-storage-service"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: shared-storage
+          alert_type: availability
+        annotations:
+          summary: "Shared Storage Service is down"
+          description: "Shared Storage Service has been down for more than 1 minute."
+          runbook_url: "https://docs.example.com/runbooks/shared-storage-down"
+
+      # Performance alerts
+      - alert: SharedStorageHighResponseTime
+        expr: histogram_quantile(0.95, rate(shared_storage_operation_duration_bucket[5m])) > 100
+        for: 2m
+        labels:
+          severity: warning
+          service: shared-storage
+          alert_type: performance
+        annotations:
+          summary: "High response time detected"
+          description: "95th percentile response time is above 100ms for 2 minutes."
+          value: "{{ $value }}ms"
+          runbook_url: "https://docs.example.com/runbooks/high-response-time"
+
+      - alert: SharedStorageCriticalResponseTime
+        expr: histogram_quantile(0.95, rate(shared_storage_operation_duration_bucket[5m])) > 500
+        for: 1m
+        labels:
+          severity: critical
+          service: shared-storage
+          alert_type: performance
+        annotations:
+          summary: "Critical response time detected"
+          description: "95th percentile response time is above 500ms for 1 minute."
+          value: "{{ $value }}ms"
+          runbook_url: "https://docs.example.com/runbooks/critical-response-time"
+
+      # Error rate alerts
+      - alert: SharedStorageHighErrorRate
+        expr: rate(shared_storage_errors_total[5m]) > 1
+        for: 2m
+        labels:
+          severity: warning
+          service: shared-storage
+          alert_type: errors
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is above 1 per minute for 2 minutes."
+          value: "{{ $value }} errors/min"
+          runbook_url: "https://docs.example.com/runbooks/high-error-rate"
+
+      - alert: SharedStorageCriticalErrorRate
+        expr: rate(shared_storage_errors_total[5m]) > 5
+        for: 1m
+        labels:
+          severity: critical
+          service: shared-storage
+          alert_type: errors
+        annotations:
+          summary: "Critical error rate detected"
+          description: "Error rate is above 5 per minute for 1 minute."
+          value: "{{ $value }} errors/min"
+          runbook_url: "https://docs.example.com/runbooks/critical-error-rate"
+
+      # Circuit breaker alerts
+      - alert: SharedStorageCircuitBreakerOpen
+        expr: shared_storage_circuit_breaker_state == 1
+        for: 30s
+        labels:
+          severity: warning
+          service: shared-storage
+          alert_type: circuit_breaker
+        annotations:
+          summary: "Circuit breaker is open"
+          description: "Circuit breaker for {{ $labels.service }}_{{ $labels.operation }} is open."
+          runbook_url: "https://docs.example.com/runbooks/circuit-breaker-open"
+
+      # Cache performance alerts
+      - alert: SharedStorageLowCacheHitRate
+        expr: rate(shared_storage_cache_hits_total[5m]) / (rate(shared_storage_cache_hits_total[5m]) + rate(shared_storage_cache_misses_total[5m])) < 0.7
+        for: 5m
+        labels:
+          severity: warning
+          service: shared-storage
+          alert_type: cache
+        annotations:
+          summary: "Low cache hit rate detected"
+          description: "Cache hit rate is below 70% for 5 minutes."
+          value: "{{ $value }}%"
+          runbook_url: "https://docs.example.com/runbooks/low-cache-hit-rate"
+
+      # Connection pool alerts
+      - alert: SharedStorageHighConnectionPoolUtilization
+        expr: rate(shared_storage_connection_pool_utilization[5m]) > 0.9
+        for: 2m
+        labels:
+          severity: warning
+          service: shared-storage
+          alert_type: connections
+        annotations:
+          summary: "High connection pool utilization"
+          description: "Connection pool utilization is above 90% for 2 minutes."
+          value: "{{ $value }}%"
+          runbook_url: "https://docs.example.com/runbooks/high-connection-utilization"
+
+      # Disk space alerts
+      - alert: SharedStorageLowDiskSpace
+        expr: (1 - (shared_storage_disk_free_bytes / shared_storage_disk_total_bytes)) > 0.85
+        for: 5m
+        labels:
+          severity: warning
+          service: shared-storage
+          alert_type: disk
+        annotations:
+          summary: "Low disk space detected"
+          description: "Disk usage is above 85% for 5 minutes."
+          value: "{{ $value }}%"
+          runbook_url: "https://docs.example.com/runbooks/low-disk-space"
+
+      - alert: SharedStorageCriticalDiskSpace
+        expr: (1 - (shared_storage_disk_free_bytes / shared_storage_disk_total_bytes)) > 0.95
+        for: 2m
+        labels:
+          severity: critical
+          service: shared-storage
+          alert_type: disk
+        annotations:
+          summary: "Critical disk space detected"
+          description: "Disk usage is above 95% for 2 minutes."
+          value: "{{ $value }}%"
+          runbook_url: "https://docs.example.com/runbooks/critical-disk-space"
+
+      # Memory alerts
+      - alert: SharedStorageHighMemoryUsage
+        expr: shared_storage_memory_usage_percent > 85
+        for: 5m
+        labels:
+          severity: warning
+          service: shared-storage
+          alert_type: memory
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage is above 85% for 5 minutes."
+          value: "{{ $value }}%"
+          runbook_url: "https://docs.example.com/runbooks/high-memory-usage"
+
+      # CPU alerts
+      - alert: SharedStorageHighCpuUsage
+        expr: rate(shared_storage_cpu_usage_percent[5m]) > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: shared-storage
+          alert_type: cpu
+        annotations:
+          summary: "High CPU usage detected"
+          description: "CPU usage is above 80% for 5 minutes."
+          value: "{{ $value }}%"
+          runbook_url: "https://docs.example.com/runbooks/high-cpu-usage"
+
+      # Queue depth alerts
+      - alert: SharedStorageHighQueueDepth
+        expr: shared_storage_operation_queue_length > 50
+        for: 2m
+        labels:
+          severity: warning
+          service: shared-storage
+          alert_type: queue
+        annotations:
+          summary: "High operation queue depth"
+          description: "Operation queue length is above 50 for 2 minutes."
+          value: "{{ $value }}"
+          runbook_url: "https://docs.example.com/runbooks/high-queue-depth"
+
+      - alert: SharedStorageCriticalQueueDepth
+        expr: shared_storage_operation_queue_length > 100
+        for: 1m
+        labels:
+          severity: critical
+          service: shared-storage
+          alert_type: queue
+        annotations:
+          summary: "Critical operation queue depth"
+          description: "Operation queue length is above 100 for 1 minute."
+          value: "{{ $value }}"
+          runbook_url: "https://docs.example.com/runbooks/critical-queue-depth"
+
+  - name: shared_storage_business_alerts
+    rules:
+      # Business impact alerts
+      - alert: SharedStorageLowAvailability
+        expr: (1 - (rate(shared_storage_errors_total{severity="critical"}[1h]) / rate(shared_storage_operations_total[1h]))) < 0.995
+        for: 15m
+        labels:
+          severity: critical
+          service: shared-storage
+          alert_type: business_impact
+          business_impact: high
+        annotations:
+          summary: "Low service availability detected"
+          description: "Service availability is below 99.5% for 15 minutes."
+          value: "{{ $value }}%"
+          business_impact: "High - Service reliability compromised"
+          runbook_url: "https://docs.example.com/runbooks/low-availability"
+
+      # Performance regression alerts
+      - alert: SharedStoragePerformanceRegression
+        expr: increase(histogram_quantile(0.95, rate(shared_storage_operation_duration_bucket[5m]))[30m]) > 50
+        for: 10m
+        labels:
+          severity: warning
+          service: shared-storage
+          alert_type: performance_regression
+        annotations:
+          summary: "Performance regression detected"
+          description: "Response time has increased by more than 50ms in the last 30 minutes."
+          value: "{{ $value }}ms increase"
+          runbook_url: "https://docs.example.com/runbooks/performance-regression"
+
+      # Usage anomaly alerts
+      - alert: SharedStorageUsageAnomaly
+        expr: abs(rate(shared_storage_operations_total[5m]) - avg_over_time(rate(shared_storage_operations_total[5m])[1h])) / stddev_over_time(rate(shared_storage_operations_total[5m])[1h]) > 3
+        for: 5m
+        labels:
+          severity: warning
+          service: shared-storage
+          alert_type: usage_anomaly
+        annotations:
+          summary: "Usage anomaly detected"
+          description: "Operation rate deviates significantly from normal pattern."
+          value: "{{ $value }} standard deviations"
+          runbook_url: "https://docs.example.com/runbooks/usage-anomaly"
+
+      # Business KPI alerts
+      - alert: SharedStorageLowUserSatisfaction
+        expr: (1 - (rate(shared_storage_errors_total[1h]) / rate(shared_storage_operations_total[1h]))) * 100 < 99.5
+        for: 30m
+        labels:
+          severity: warning
+          service: shared-storage
+          alert_type: user_satisfaction
+          business_impact: medium
+        annotations:
+          summary: "Low user satisfaction detected"
+          description: "User satisfaction score is below 99.5% for 30 minutes."
+          value: "{{ $value }}%"
+          business_impact: "Medium - User experience impacted"
+          runbook_url: "https://docs.example.com/runbooks/low-user-satisfaction"

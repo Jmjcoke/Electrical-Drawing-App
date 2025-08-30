@@ -1,0 +1,573 @@
+openapi: 3.0.3
+info:
+  title: SharedStorageService API
+  description: |
+    Cross-service file access API for the Electrical Drawing Analysis Application.
+    Provides secure, controlled access to session-based file storage across microservices.
+  version: 1.0.0
+  contact:
+    name: DevOps Team
+    email: devops@electrical-drawing-app.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Local development server
+  - url: https://api.electrical-drawing-app.com/api/v1
+    description: Production server
+
+security:
+  - BearerAuth: []
+  - ApiKeyAuth: []
+
+paths:
+  # Health Monitoring Endpoints
+  /shared-storage/health:
+    get:
+      summary: Basic health check
+      description: |
+        Returns basic health status of the SharedStorageService.
+        Used by load balancers and monitoring systems for service availability.
+      tags:
+        - Health
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                status: "healthy"
+                timestamp: "2024-01-27T10:30:00.000Z"
+                service: "shared-storage-service"
+                version: "1.0.0"
+        '503':
+          description: Service is unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /shared-storage/health/detailed:
+    get:
+      summary: Detailed health check
+      description: |
+        Returns comprehensive health information including storage metrics,
+        session counts, and subsystem status for debugging and detailed monitoring.
+      tags:
+        - Health
+      responses:
+        '200':
+          description: Detailed health information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailedHealthResponse'
+        '503':
+          description: Service is unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /shared-storage/health/ready:
+    get:
+      summary: Readiness probe
+      description: |
+        Kubernetes readiness probe endpoint. Indicates if the service is ready to accept traffic.
+      tags:
+        - Health
+      responses:
+        '200':
+          description: Service is ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessResponse'
+        '503':
+          description: Service is not ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /shared-storage/health/live:
+    get:
+      summary: Liveness probe
+      description: |
+        Kubernetes liveness probe endpoint. Basic check to determine if the service is running.
+      tags:
+        - Health
+      responses:
+        '200':
+          description: Service is alive
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LivenessResponse'
+        '503':
+          description: Service is not alive
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /shared-storage/metrics:
+    get:
+      summary: Prometheus metrics
+      description: |
+        Exposes Prometheus-compatible metrics for monitoring storage usage,
+        performance, error rates, and operational statistics.
+      tags:
+        - Monitoring
+      responses:
+        '200':
+          description: Metrics in Prometheus format
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: |
+                  # HELP shared_storage_operations_total Total number of storage operations
+                  # TYPE shared_storage_operations_total counter
+                  shared_storage_operations_total{operation="getSessionPath",service="file-processor"} 150
+                  shared_storage_operations_total{operation="accessFile",service="llm-orchestrator"} 89
+
+  # Core Storage API Endpoints (Planned)
+  /shared-storage/sessions/{sessionId}/path:
+    get:
+      summary: Get session path
+      description: |
+        Returns the absolute path to a session directory for the requesting service.
+        This endpoint validates permissions before returning the path.
+      tags:
+        - Core Storage
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: UUID of the session
+        - name: service
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [file-processor, llm-orchestrator, response-aggregator]
+          description: Name of the requesting service
+      responses:
+        '200':
+          description: Session path returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionPathResponse'
+        '403':
+          description: Service not authorized to access session
+        '404':
+          description: Session not found
+
+  /shared-storage/sessions/{sessionId}/files/{filepath}:
+    get:
+      summary: Access file
+      description: |
+        Returns the contents of a specific file from the session directory.
+        Includes permission validation and path traversal protection.
+      tags:
+        - Core Storage
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: UUID of the session
+        - name: filepath
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Relative path within session directory (e.g., 'converted_images/page1.jpg')
+        - name: service
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [file-processor, llm-orchestrator, response-aggregator]
+          description: Name of the requesting service
+      responses:
+        '200':
+          description: File contents returned
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '403':
+          description: Service not authorized to access file
+        '404':
+          description: File or session not found
+
+  /shared-storage/sessions/{sessionId}/permissions:
+    get:
+      summary: Check permissions
+      description: |
+        Validates if the requesting service has permission to access the specified session.
+      tags:
+        - Core Storage
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: UUID of the session
+        - name: service
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [file-processor, llm-orchestrator, response-aggregator]
+          description: Name of the requesting service
+      responses:
+        '200':
+          description: Permission status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PermissionResponse'
+        '400':
+          description: Invalid service name
+
+  /shared-storage/sessions/{sessionId}/files:
+    get:
+      summary: List files
+      description: |
+        Returns a list of files in the specified session directory or subdirectory.
+      tags:
+        - Core Storage
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: UUID of the session
+        - name: subPath
+          in: query
+          schema:
+            type: string
+          description: Optional subdirectory path (e.g., 'converted_images')
+        - name: service
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [file-processor, llm-orchestrator, response-aggregator]
+          description: Name of the requesting service
+      responses:
+        '200':
+          description: File list returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileListResponse'
+        '403':
+          description: Service not authorized to access session
+
+  /shared-storage/sessions/{sessionId}/files/{filepath}/exists:
+    get:
+      summary: Check file existence
+      description: |
+        Checks if a specific file exists in the session directory.
+      tags:
+        - Core Storage
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: UUID of the session
+        - name: filepath
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Relative path within session directory
+        - name: service
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [file-processor, llm-orchestrator, response-aggregator]
+          description: Name of the requesting service
+      responses:
+        '200':
+          description: File existence status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileExistsResponse'
+        '403':
+          description: Service not authorized to access session
+
+components:
+  schemas:
+    # Health Response Schemas
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - timestamp
+        - service
+      properties:
+        status:
+          type: string
+          enum: [healthy, unhealthy]
+        timestamp:
+          type: string
+          format: date-time
+        service:
+          type: string
+          example: "shared-storage-service"
+        version:
+          type: string
+          example: "1.0.0"
+
+    DetailedHealthResponse:
+      type: object
+      required:
+        - status
+        - timestamp
+        - service
+        - checks
+      properties:
+        status:
+          type: string
+          enum: [healthy, unhealthy]
+        timestamp:
+          type: string
+          format: date-time
+        service:
+          type: string
+          example: "shared-storage-service"
+        version:
+          type: string
+          example: "1.0.0"
+        checks:
+          type: object
+          properties:
+            filesystem:
+              $ref: '#/components/schemas/HealthCheck'
+            permissions:
+              $ref: '#/components/schemas/HealthCheck'
+            sessions:
+              $ref: '#/components/schemas/HealthCheck'
+
+    HealthCheck:
+      type: object
+      required:
+        - status
+        - timestamp
+      properties:
+        status:
+          type: string
+          enum: [healthy, unhealthy]
+        timestamp:
+          type: string
+          format: date-time
+        details:
+          type: object
+
+    ReadinessResponse:
+      type: object
+      required:
+        - status
+        - ready
+        - timestamp
+      properties:
+        status:
+          type: string
+          enum: [ready, not_ready]
+        ready:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        checks:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              status:
+                type: string
+                enum: [ready, not_ready]
+
+    LivenessResponse:
+      type: object
+      required:
+        - status
+        - alive
+        - timestamp
+      properties:
+        status:
+          type: string
+          enum: [alive, dead]
+        alive:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+
+    # Core API Response Schemas
+    SessionPathResponse:
+      type: object
+      required:
+        - sessionId
+        - path
+        - service
+      properties:
+        sessionId:
+          type: string
+          format: uuid
+        path:
+          type: string
+          description: Absolute path to session directory
+        service:
+          type: string
+          enum: [file-processor, llm-orchestrator, response-aggregator]
+
+    PermissionResponse:
+      type: object
+      required:
+        - sessionId
+        - service
+        - hasPermission
+      properties:
+        sessionId:
+          type: string
+          format: uuid
+        service:
+          type: string
+          enum: [file-processor, llm-orchestrator, response-aggregator]
+        hasPermission:
+          type: boolean
+        allowedSubPaths:
+          type: array
+          items:
+            type: string
+
+    FileListResponse:
+      type: object
+      required:
+        - sessionId
+        - files
+        - count
+      properties:
+        sessionId:
+          type: string
+          format: uuid
+        files:
+          type: array
+          items:
+            type: string
+        count:
+          type: integer
+          minimum: 0
+        subPath:
+          type: string
+
+    FileExistsResponse:
+      type: object
+      required:
+        - sessionId
+        - filepath
+        - exists
+      properties:
+        sessionId:
+          type: string
+          format: uuid
+        filepath:
+          type: string
+        exists:
+          type: boolean
+        size:
+          type: integer
+          description: File size in bytes (if exists)
+        modified:
+          type: string
+          format: date-time
+          description: Last modified timestamp (if exists)
+
+    # Error Schema
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: object
+          required:
+            - code
+            - message
+            - timestamp
+          properties:
+            code:
+              type: string
+              enum:
+                - PERMISSION_DENIED
+                - FILE_NOT_FOUND
+                - SESSION_NOT_FOUND
+                - SERVICE_UNAUTHORIZED
+                - PATH_TRAVERSAL_DETECTED
+                - FILE_ACCESS_ERROR
+                - INVALID_SESSION_ID
+                - INVALID_SERVICE_NAME
+                - INTERNAL_ERROR
+            message:
+              type: string
+            details:
+              type: object
+            sessionId:
+              type: string
+              format: uuid
+            service:
+              type: string
+            filepath:
+              type: string
+            timestamp:
+              type: string
+              format: date-time
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token for service-to-service authentication
+
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key for service authentication
+
+tags:
+  - name: Core Storage
+    description: Core SharedStorageService functionality
+  - name: Health
+    description: Health monitoring and status endpoints
+  - name: Monitoring
+    description: Metrics and monitoring endpoints

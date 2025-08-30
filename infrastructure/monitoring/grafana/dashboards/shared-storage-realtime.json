@@ -1,0 +1,586 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Shared Storage Service - Real-Time Monitoring",
+    "description": "Real-time monitoring dashboard with live metrics, instant alerts, and immediate operational visibility",
+    "tags": ["shared-storage", "real-time", "monitoring", "live"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "🚨 LIVE ALERTS",
+        "type": "alertlist",
+        "gridPos": {"h": 6, "w": 24, "x": 0, "y": 0},
+        "options": {
+          "showOptions": "current",
+          "alertName": "SharedStorage.*",
+          "dashboardAlerts": false,
+          "alertInstanceLabelFilter": "",
+          "maxItems": 20,
+          "sortOrder": 1
+        }
+      },
+      {
+        "id": 2,
+        "title": "Current System Status",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 4, "x": 0, "y": 6},
+        "targets": [
+          {
+            "expr": "up{job=\"shared-storage-service\"}",
+            "legendFormat": "Service Status",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [
+              {
+                "options": {
+                  "0": {
+                    "text": "DOWN",
+                    "color": "red"
+                  },
+                  "1": {
+                    "text": "UP",
+                    "color": "green"
+                  }
+                },
+                "type": "value"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "Active Operations",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 4, "x": 4, "y": 6},
+        "targets": [
+          {
+            "expr": "shared_storage_active_operations",
+            "legendFormat": "Active Operations",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "orange", "value": 50},
+                {"color": "red", "value": 100}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "Queue Depth",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 4, "x": 8, "y": 6},
+        "targets": [
+          {
+            "expr": "shared_storage_operation_queue_length",
+            "legendFormat": "Queued Operations",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "orange", "value": 10},
+                {"color": "red", "value": 50}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "Circuit Breakers",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 4, "x": 12, "y": 6},
+        "targets": [
+          {
+            "expr": "count(shared_storage_circuit_breaker_state == 1)",
+            "legendFormat": "Open Circuit Breakers",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "red", "value": 1}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 6,
+        "title": "P95 Response Time",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 4, "x": 16, "y": 6},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(shared_storage_operation_duration_bucket[30s]))",
+            "legendFormat": "P95 Latency",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "orange", "value": 50},
+                {"color": "red", "value": 100}
+              ]
+            },
+            "unit": "ms"
+          }
+        }
+      },
+      {
+        "id": 7,
+        "title": "Error Rate (1min)",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 4, "x": 20, "y": 6},
+        "targets": [
+          {
+            "expr": "rate(shared_storage_errors_total[1m])",
+            "legendFormat": "Errors/min",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "orange", "value": 1},
+                {"color": "red", "value": 5}
+              ]
+            },
+            "unit": "errors/min"
+          }
+        }
+      },
+      {
+        "id": 8,
+        "title": "Real-Time Operations/sec",
+        "type": "bargauge",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 10},
+        "targets": [
+          {
+            "expr": "rate(shared_storage_operations_total[30s])",
+            "legendFormat": "Total Operations/sec",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(shared_storage_operations_total{status=\"success\"}[30s])",
+            "legendFormat": "Successful Operations/sec",
+            "refId": "B"
+          },
+          {
+            "expr": "rate(shared_storage_operations_total{status=\"error\"}[30s])",
+            "legendFormat": "Failed Operations/sec",
+            "refId": "C"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "min": 0,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "orange", "value": 50},
+                {"color": "red", "value": 100}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 9,
+        "title": "Live Response Time Distribution",
+        "type": "bargauge",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 10},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(shared_storage_operation_duration_bucket[30s]))",
+            "legendFormat": "Median Response Time",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(shared_storage_operation_duration_bucket[30s]))",
+            "legendFormat": "P95 Response Time",
+            "refId": "B"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(shared_storage_operation_duration_bucket[30s]))",
+            "legendFormat": "P99 Response Time",
+            "refId": "C"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "min": 0,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "orange", "value": 50},
+                {"color": "red", "value": 100}
+              ]
+            },
+            "unit": "ms"
+          }
+        }
+      },
+      {
+        "id": 10,
+        "title": "Live Cache Performance",
+        "type": "bargauge",
+        "gridPos": {"h": 6, "w": 8, "x": 0, "y": 18},
+        "targets": [
+          {
+            "expr": "rate(shared_storage_cache_hits_total[30s]) / (rate(shared_storage_cache_hits_total[30s]) + rate(shared_storage_cache_misses_total[30s])) * 100",
+            "legendFormat": "Cache Hit Rate %",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "orange", "value": 70},
+                {"color": "green", "value": 90}
+              ]
+            },
+            "unit": "percent"
+          }
+        }
+      },
+      {
+        "id": 11,
+        "title": "Connection Pool Status",
+        "type": "bargauge",
+        "gridPos": {"h": 6, "w": 8, "x": 8, "y": 18},
+        "targets": [
+          {
+            "expr": "rate(shared_storage_connection_pool_utilization[30s])",
+            "legendFormat": "Connection Pool Utilization %",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "orange", "value": 70},
+                {"color": "red", "value": 90}
+              ]
+            },
+            "unit": "percent"
+          }
+        }
+      },
+      {
+        "id": 12,
+        "title": "Active Connections",
+        "type": "bargauge",
+        "gridPos": {"h": 6, "w": 8, "x": 16, "y": 18},
+        "targets": [
+          {
+            "expr": "shared_storage_active_connections",
+            "legendFormat": "Active Connections",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "min": 0,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "orange", "value": 50},
+                {"color": "red", "value": 100}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 13,
+        "title": "Live Operations Stream",
+        "type": "logs",
+        "gridPos": {"h": 12, "w": 12, "x": 0, "y": 24},
+        "targets": [
+          {
+            "expr": "{job=\"shared-storage-service\"} |= \"\"",
+            "legendFormat": "",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "showTime": true,
+          "showLabels": false,
+          "showCommonLabels": false,
+          "wrapLogMessage": true,
+          "prettifyLogMessage": true,
+          "enableLogDetails": true,
+          "dedupStrategy": "none",
+          "sortOrder": "Descending"
+        }
+      },
+      {
+        "id": 14,
+        "title": "Top Operations by Volume",
+        "type": "table",
+        "gridPos": {"h": 12, "w": 6, "x": 12, "y": 24},
+        "targets": [
+          {
+            "expr": "topk(10, rate(shared_storage_operations_total[5m]))",
+            "legendFormat": "{{operation}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "align": "left",
+              "displayMode": "auto",
+              "filterable": true
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "orange", "value": 10},
+                {"color": "red", "value": 50}
+              ]
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "Time"},
+              "properties": [{"id": "displayName", "value": "Time"}]
+            },
+            {
+              "matcher": {"id": "byName", "options": "Value"},
+              "properties": [{"id": "displayName", "value": "Operations/sec"}]
+            }
+          ]
+        }
+      },
+      {
+        "id": 15,
+        "title": "Recent Errors",
+        "type": "table",
+        "gridPos": {"h": 12, "w": 6, "x": 18, "y": 24},
+        "targets": [
+          {
+            "expr": "topk(10, increase(shared_storage_errors_total[5m]))",
+            "legendFormat": "{{error_type}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "align": "left",
+              "displayMode": "auto",
+              "filterable": true
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "red", "value": 1}
+              ]
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "Time"},
+              "properties": [{"id": "displayName", "value": "Time"}]
+            },
+            {
+              "matcher": {"id": "byName", "options": "Value"},
+              "properties": [{"id": "displayName", "value": "Error Count"}]
+            }
+          ]
+        }
+      },
+      {
+        "id": 16,
+        "title": "Real-Time Performance Trends (5min)",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 36},
+        "targets": [
+          {
+            "expr": "rate(shared_storage_operations_total[30s])",
+            "legendFormat": "Operations/sec",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(shared_storage_operation_duration_bucket[30s]))",
+            "legendFormat": "P95 Response Time",
+            "refId": "B"
+          }
+        ],
+        "yAxes": [
+          {"format": "ops", "label": "Operations/sec", "logBase": 1, "min": 0},
+          {"format": "ms", "label": "Response Time", "logBase": 1, "min": 0}
+        ],
+        "seriesOverrides": [
+          {
+            "alias": "P95 Response Time",
+            "yaxis": 2
+          }
+        ]
+      },
+      {
+        "id": 17,
+        "title": "System Resources",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 36},
+        "targets": [
+          {
+            "expr": "rate(shared_storage_cpu_usage_percent[30s])",
+            "legendFormat": "CPU Usage %",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(shared_storage_memory_usage_percent[30s])",
+            "legendFormat": "Memory Usage %",
+            "refId": "B"
+          },
+          {
+            "expr": "rate(shared_storage_disk_usage_percent[30s])",
+            "legendFormat": "Disk Usage %",
+            "refId": "C"
+          }
+        ],
+        "yAxes": [
+          {"format": "percent", "label": "Usage", "logBase": 1, "min": 0, "max": 100},
+          {"format": "short", "label": "", "logBase": 1}
+        ]
+      },
+      {
+        "id": 18,
+        "title": "Quick Actions & Status",
+        "type": "text",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 44},
+        "options": {
+          "content": "# ⚡ Quick Actions & Status\n\n## System Status\n- **Service**: ${__field.display(service_status, 'UNKNOWN')}\n- **Circuit Breakers**: ${__field.display(circuit_breakers, '0')} open\n- **Active Operations**: ${__field.display(active_operations, '0')}\n- **Queue Depth**: ${__field.display(queue_depth, '0')}\n\n## Performance Metrics\n- **P95 Response Time**: ${__field.display(p95_latency, 'N/A')}ms\n- **Error Rate**: ${__field.display(error_rate, '0')}/min\n- **Cache Hit Rate**: ${__field.display(cache_hit_rate, 'N/A')}%\n- **Connection Pool**: ${__field.display(connection_pool, 'N/A')}%\n\n## Quick Actions\n\n### Emergency Response\n```\n# Restart service\ndocker restart shared-storage-service\n\n# Clear operation queue\nPOST /api/v1/operations/clear\n\n# Reset circuit breakers\nPOST /api/v1/circuit-breakers/reset\n\n# Enable maintenance mode\nPOST /api/v1/maintenance/enable\n```\n\n### Performance Tuning\n```\n# Adjust cache size\nPOST /api/v1/cache/configure {\"size\": \"200MB\"}\n\n# Modify connection pool\nPOST /api/v1/connections/configure {\"max\": 50}\n\n# Update rate limits\nPOST /api/v1/rate-limits/configure {\"operations\": 100}\n```\n\n### Monitoring\n```\n# View detailed health\nGET /health/detailed\n\n# Check metrics\nGET /metrics\n\n# View recent logs\nGET /logs?level=ERROR&limit=50\n```\n\n## Alert Thresholds\n- **Response Time**: >100ms (Warning), >500ms (Critical)\n- **Error Rate**: >1/min (Warning), >5/min (Critical)\n- **Circuit Breakers**: Any open (Critical)\n- **Queue Depth**: >50 (Warning), >100 (Critical)\n\n*Last updated: ${__from:date:YYYY-MM-DD HH:mm:ss}*",
+          "mode": "markdown"
+        }
+      }
+    ],
+    "time": {
+      "from": "now-5m",
+      "to": "now"
+    },
+    "timepicker": {
+      "refresh_intervals": ["5s", "10s", "30s", "1m", "5m"]
+    },
+    "templating": {
+      "list": [
+        {
+          "name": "refresh_interval",
+          "type": "interval",
+          "query": "5s,10s,30s,1m,5m",
+          "label": "Refresh Interval",
+          "auto": false,
+          "auto_count": 30,
+          "auto_min": "5s",
+          "current": {"selected": true, "text": "30s", "value": "30s"}
+        },
+        {
+          "name": "service_instance",
+          "type": "query",
+          "query": "label_values(shared_storage_service_info, instance)",
+          "label": "Service Instance",
+          "multi": false,
+          "includeAll": true
+        }
+      ]
+    },
+    "annotations": {
+      "list": [
+        {
+          "builtIn": 1,
+          "datasource": "-- Grafana --",
+          "enable": true,
+          "hide": true,
+          "iconColor": "rgba(0, 211, 255, 1)",
+          "name": "Annotations & Alerts",
+          "type": "dashboard"
+        },
+        {
+          "datasource": "prometheus",
+          "enable": true,
+          "expr": "shared_storage_circuit_breaker_state == 1",
+          "hide": false,
+          "iconColor": "red",
+          "name": "Circuit Breaker Open",
+          "textFormat": "Circuit breaker opened for {{service}}_{{operation}}"
+        }
+      ]
+    },
+    "refresh": "30s",
+    "schemaVersion": 27,
+    "version": 0,
+    "links": [
+      {
+        "title": "Service Dashboard",
+        "type": "link",
+        "url": "/d/shared-storage-overview",
+        "targetBlank": true
+      },
+      {
+        "title": "Operational Dashboard",
+        "type": "link",
+        "url": "/d/shared-storage-operational",
+        "targetBlank": true
+      },
+      {
+        "title": "API Documentation",
+        "type": "link",
+        "url": "/docs/api/shared-storage",
+        "targetBlank": true
+      }
+    ]
+  }
+}

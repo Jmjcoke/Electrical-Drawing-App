@@ -1,0 +1,534 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Shared Storage Service - Business Metrics",
+    "description": "Business metrics dashboard showing file access patterns, performance correlation, and operational KPIs",
+    "tags": ["shared-storage", "business-metrics", "kpi", "correlation"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Business KPIs Overview",
+        "type": "stat",
+        "gridPos": {"h": 6, "w": 6, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "rate(shared_storage_file_access_total[1h])",
+            "legendFormat": "Files Accessed/Hour",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "orange", "value": 100},
+                {"color": "green", "value": 500}
+              ]
+            },
+            "unit": "files/h"
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Average Response Time",
+        "type": "stat",
+        "gridPos": {"h": 6, "w": 6, "x": 6, "y": 0},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(shared_storage_operation_duration_bucket[5m]))",
+            "legendFormat": "Avg Response Time",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "orange", "value": 50},
+                {"color": "red", "value": 100}
+              ]
+            },
+            "unit": "ms"
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "Cache Efficiency",
+        "type": "stat",
+        "gridPos": {"h": 6, "w": 6, "x": 12, "y": 0},
+        "targets": [
+          {
+            "expr": "rate(shared_storage_cache_hits_total[5m]) / (rate(shared_storage_cache_hits_total[5m]) + rate(shared_storage_cache_misses_total[5m])) * 100",
+            "legendFormat": "Cache Hit Rate",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "orange", "value": 70},
+                {"color": "green", "value": 90}
+              ]
+            },
+            "unit": "percent"
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "Service Availability",
+        "type": "stat",
+        "gridPos": {"h": 6, "w": 6, "x": 18, "y": 0},
+        "targets": [
+          {
+            "expr": "(1 - (rate(shared_storage_errors_total{severity=\"critical\"}[7d]) / rate(shared_storage_operations_total[7d]))) * 100",
+            "legendFormat": "Uptime %",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "orange", "value": 99.5},
+                {"color": "green", "value": 99.9}
+              ]
+            },
+            "unit": "percent"
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "File Access Patterns Over Time",
+        "type": "graph",
+        "gridPos": {"h": 10, "w": 12, "x": 0, "y": 6},
+        "targets": [
+          {
+            "expr": "rate(shared_storage_file_access_total[5m])",
+            "legendFormat": "File Access Rate",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(shared_storage_file_operations_total{operation=\"read\"}[5m])",
+            "legendFormat": "Read Operations",
+            "refId": "B"
+          },
+          {
+            "expr": "rate(shared_storage_file_operations_total{operation=\"write\"}[5m])",
+            "legendFormat": "Write Operations",
+            "refId": "C"
+          },
+          {
+            "expr": "rate(shared_storage_file_operations_total{operation=\"delete\"}[5m])",
+            "legendFormat": "Delete Operations",
+            "refId": "D"
+          }
+        ],
+        "yAxes": [
+          {"format": "ops", "label": "Operations/sec", "logBase": 1, "min": 0},
+          {"format": "short", "label": "", "logBase": 1}
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Top Accessed Files",
+        "type": "table",
+        "gridPos": {"h": 10, "w": 12, "x": 12, "y": 6},
+        "targets": [
+          {
+            "expr": "topk(20, increase(shared_storage_file_access_total[1h]))",
+            "legendFormat": "{{filepath}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "align": "left",
+              "displayMode": "auto",
+              "filterable": true
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "orange", "value": 10},
+                {"color": "red", "value": 50}
+              ]
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "Time"},
+              "properties": [{"id": "displayName", "value": "Time"}]
+            },
+            {
+              "matcher": {"id": "byName", "options": "Value"},
+              "properties": [{"id": "displayName", "value": "Access Count"}]
+            }
+          ]
+        }
+      },
+      {
+        "id": 7,
+        "title": "Performance vs Access Correlation",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 16, "x": 0, "y": 16},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(shared_storage_operation_duration_bucket[5m]))",
+            "legendFormat": "P95 Response Time (ms)",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(shared_storage_file_access_total[5m]) / 10",
+            "legendFormat": "File Access Rate (scaled)",
+            "refId": "B"
+          }
+        ],
+        "yAxes": [
+          {"format": "ms", "label": "Response Time", "logBase": 1, "min": 0},
+          {"format": "short", "label": "Access Rate", "logBase": 1, "min": 0}
+        ],
+        "seriesOverrides": [
+          {
+            "alias": "File Access Rate (scaled)",
+            "yaxis": 2
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Service Usage by Client",
+        "type": "bargauge",
+        "gridPos": {"h": 8, "w": 8, "x": 16, "y": 16},
+        "targets": [
+          {
+            "expr": "sum(rate(shared_storage_operations_total[1h])) by (service)",
+            "legendFormat": "{{service}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [],
+            "min": 0,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "orange", "value": 100},
+                {"color": "red", "value": 500}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 9,
+        "title": "File Type Distribution",
+        "type": "piechart",
+        "gridPos": {"h": 8, "w": 8, "x": 0, "y": 24},
+        "targets": [
+          {
+            "expr": "count by (file_extension) (shared_storage_file_info)",
+            "legendFormat": "{{file_extension}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "red", "value": 10}
+              ]
+            }
+          }
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "orientation": "auto",
+          "textMode": "auto",
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto"
+        }
+      },
+      {
+        "id": 10,
+        "title": "Business Hours vs Off-Hours Performance",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 16, "x": 8, "y": 24},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(shared_storage_operation_duration_bucket[5m])) and ON() hour() >= 9 and hour() <= 17",
+            "legendFormat": "Business Hours P95",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(shared_storage_operation_duration_bucket[5m])) and ON() (hour() < 9 or hour() > 17)",
+            "legendFormat": "Off-Hours P95",
+            "refId": "B"
+          },
+          {
+            "expr": "rate(shared_storage_file_access_total[5m]) and ON() hour() >= 9 and hour() <= 17",
+            "legendFormat": "Business Hours Access Rate",
+            "refId": "C"
+          },
+          {
+            "expr": "rate(shared_storage_file_access_total[5m]) and ON() (hour() < 9 or hour() > 17)",
+            "legendFormat": "Off-Hours Access Rate",
+            "refId": "D"
+          }
+        ],
+        "yAxes": [
+          {"format": "ms", "label": "Response Time", "logBase": 1, "min": 0},
+          {"format": "ops", "label": "Access Rate", "logBase": 1, "min": 0}
+        ],
+        "seriesOverrides": [
+          {
+            "alias": "Business Hours Access Rate",
+            "yaxis": 2
+          },
+          {
+            "alias": "Off-Hours Access Rate",
+            "yaxis": 2
+          }
+        ]
+      },
+      {
+        "id": 11,
+        "title": "Storage Efficiency Metrics",
+        "type": "stat",
+        "gridPos": {"h": 6, "w": 6, "x": 0, "y": 32},
+        "targets": [
+          {
+            "expr": "shared_storage_storage_efficiency_ratio",
+            "legendFormat": "Storage Efficiency",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "orange", "value": 1.5},
+                {"color": "green", "value": 2.0}
+              ]
+            },
+            "unit": "ratio"
+          }
+        }
+      },
+      {
+        "id": 12,
+        "title": "Cost Efficiency",
+        "type": "stat",
+        "gridPos": {"h": 6, "w": 6, "x": 6, "y": 32},
+        "targets": [
+          {
+            "expr": "rate(shared_storage_operations_total[1h]) / shared_storage_infrastructure_cost",
+            "legendFormat": "Operations per Cost Unit",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "orange", "value": 1000},
+                {"color": "red", "value": 5000}
+              ]
+            },
+            "unit": "currency"
+          }
+        }
+      },
+      {
+        "id": 13,
+        "title": "User Satisfaction Score",
+        "type": "stat",
+        "gridPos": {"h": 6, "w": 6, "x": 12, "y": 32},
+        "targets": [
+          {
+            "expr": "(1 - (rate(shared_storage_errors_total[1h]) / rate(shared_storage_operations_total[1h]))) * 100",
+            "legendFormat": "User Satisfaction %",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "orange", "value": 95},
+                {"color": "green", "value": 99}
+              ]
+            },
+            "unit": "percent"
+          }
+        }
+      },
+      {
+        "id": 14,
+        "title": "Forecasting: Next 24h Usage",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 38},
+        "targets": [
+          {
+            "expr": "predict_linear(rate(shared_storage_file_access_total[1h])[24h:1h], 24 * 3600)",
+            "legendFormat": "Predicted Access Rate",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(shared_storage_file_access_total[1h])",
+            "legendFormat": "Current Access Rate",
+            "refId": "B"
+          }
+        ],
+        "yAxes": [
+          {"format": "ops", "label": "Access Rate", "logBase": 1, "min": 0},
+          {"format": "short", "label": "", "logBase": 1}
+        ]
+      },
+      {
+        "id": 15,
+        "title": "Business Impact Analysis",
+        "type": "table",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 38},
+        "targets": [
+          {
+            "expr": "shared_storage_business_impact_score",
+            "legendFormat": "{{service}} Impact",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "align": "left",
+              "displayMode": "auto",
+              "filterable": true
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "orange", "value": 50},
+                {"color": "red", "value": 80}
+              ]
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "Time"},
+              "properties": [{"id": "displayName", "value": "Time"}]
+            },
+            {
+              "matcher": {"id": "byName", "options": "Value"},
+              "properties": [{"id": "displayName", "value": "Business Impact Score"}]
+            }
+          ]
+        }
+      }
+    ],
+    "time": {
+      "from": "now-24h",
+      "to": "now"
+    },
+    "timepicker": {},
+    "templating": {
+      "list": [
+        {
+          "name": "business_unit",
+          "type": "query",
+          "query": "label_values(shared_storage_business_unit, business_unit)",
+          "label": "Business Unit",
+          "multi": false,
+          "includeAll": true
+        },
+        {
+          "name": "service_tier",
+          "type": "custom",
+          "query": "gold,silver,bronze",
+          "label": "Service Tier",
+          "multi": false,
+          "current": {"selected": true, "text": "gold", "value": "gold"}
+        }
+      ]
+    },
+    "annotations": {
+      "list": [
+        {
+          "builtIn": 1,
+          "datasource": "-- Grafana --",
+          "enable": true,
+          "hide": true,
+          "iconColor": "rgba(0, 211, 255, 1)",
+          "name": "Annotations & Alerts",
+          "type": "dashboard"
+        },
+        {
+          "datasource": "prometheus",
+          "enable": true,
+          "expr": "shared_storage_business_impact_score > 80",
+          "hide": false,
+          "iconColor": "red",
+          "name": "High Business Impact",
+          "textFormat": "High business impact detected for {{service}}"
+        }
+      ]
+    },
+    "refresh": "5m",
+    "schemaVersion": 27,
+    "version": 0,
+    "links": [
+      {
+        "title": "Executive Summary",
+        "type": "link",
+        "url": "/reports/shared-storage-business-summary",
+        "targetBlank": true
+      },
+      {
+        "title": "Performance Reports",
+        "type": "link",
+        "url": "/reports/shared-storage-performance",
+        "targetBlank": true
+      }
+    ]
+  }
+}

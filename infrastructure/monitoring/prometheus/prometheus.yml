@@ -1,0 +1,79 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  scrape_timeout: 10s
+
+rule_files:
+  - "alert_rules.yml"
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+scrape_configs:
+  # Shared Storage Service
+  - job_name: 'shared-storage-service'
+    static_configs:
+      - targets: ['shared-storage-service:3001']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+    scrape_timeout: 5s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'shared-storage-service'
+      - source_labels: [__address__]
+        target_label: service
+        replacement: 'shared-storage'
+
+  # Node Exporter (System metrics)
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    scrape_interval: 15s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'shared-storage-host'
+
+  # cAdvisor (Container metrics)
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+    scrape_interval: 15s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'shared-storage-containers'
+
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    scrape_interval: 15s
+
+  # Pushgateway
+  - job_name: 'pushgateway'
+    static_configs:
+      - targets: ['pushgateway:9091']
+    scrape_interval: 15s
+    honor_labels: true
+
+  # File-based service discovery (for dynamic service registration)
+  - job_name: 'shared-storage-dynamic'
+    file_sd_configs:
+      - files:
+        - '/etc/prometheus/shared-storage-targets.yml'
+        refresh_interval: 30s
+    scrape_interval: 10s
+    relabel_configs:
+      - source_labels: [__meta_filepath]
+        target_label: config_file
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: '${1}:3001'
+      - source_labels: [__address__]
+        target_label: service
+        replacement: 'shared-storage-dynamic'

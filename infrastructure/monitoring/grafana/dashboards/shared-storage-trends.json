@@ -1,0 +1,454 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Shared Storage Service - Trends & Forecasting",
+    "description": "Historical trend analysis and forecasting dashboard for capacity planning and performance optimization",
+    "tags": ["shared-storage", "trends", "forecasting", "capacity-planning"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "7-Day Usage Trends",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "rate(shared_storage_operations_total[1h])",
+            "legendFormat": "Operations/Hour",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(shared_storage_file_access_total[1h])",
+            "legendFormat": "File Access/Hour",
+            "refId": "B"
+          },
+          {
+            "expr": "rate(shared_storage_errors_total[1h])",
+            "legendFormat": "Errors/Hour",
+            "refId": "C"
+          }
+        ],
+        "yAxes": [
+          {"format": "ops", "label": "Operations/Hour", "logBase": 1, "min": 0},
+          {"format": "short", "label": "", "logBase": 1}
+        ],
+        "seriesOverrides": [
+          {
+            "alias": "Errors/Hour",
+            "yaxis": 2,
+            "color": "red"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Performance Trends (30 Days)",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(shared_storage_operation_duration_bucket[1h]))",
+            "legendFormat": "P50 Response Time",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(shared_storage_operation_duration_bucket[1h]))",
+            "legendFormat": "P95 Response Time",
+            "refId": "B"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(shared_storage_operation_duration_bucket[1h]))",
+            "legendFormat": "P99 Response Time",
+            "refId": "C"
+          }
+        ],
+        "yAxes": [
+          {"format": "ms", "label": "Response Time", "logBase": 1, "min": 0},
+          {"format": "short", "label": "", "logBase": 1}
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Error Rate Trends (30 Days)",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+        "targets": [
+          {
+            "expr": "rate(shared_storage_errors_total[1h]) / rate(shared_storage_operations_total[1h]) * 100",
+            "legendFormat": "Error Rate %",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(shared_storage_errors_total{severity=\"critical\"}[1h]) / rate(shared_storage_operations_total[1h]) * 100",
+            "legendFormat": "Critical Error Rate %",
+            "refId": "B"
+          }
+        ],
+        "yAxes": [
+          {"format": "percent", "label": "Error Rate", "logBase": 1, "min": 0, "max": 5},
+          {"format": "short", "label": "", "logBase": 1}
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Cache Performance Trends",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+        "targets": [
+          {
+            "expr": "rate(shared_storage_cache_hits_total[1h]) / (rate(shared_storage_cache_hits_total[1h]) + rate(shared_storage_cache_misses_total[1h])) * 100",
+            "legendFormat": "Cache Hit Rate %",
+            "refId": "A"
+          },
+          {
+            "expr": "shared_storage_cache_size_bytes / 1024 / 1024",
+            "legendFormat": "Cache Size (MB)",
+            "refId": "B"
+          }
+        ],
+        "yAxes": [
+          {"format": "percent", "label": "Hit Rate", "logBase": 1, "min": 0, "max": 100},
+          {"format": "MB", "label": "Cache Size", "logBase": 1, "min": 0}
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Connection Pool Utilization",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+        "targets": [
+          {
+            "expr": "rate(shared_storage_connection_pool_utilization[1h])",
+            "legendFormat": "Connection Pool Utilization %",
+            "refId": "A"
+          },
+          {
+            "expr": "shared_storage_active_connections",
+            "legendFormat": "Active Connections",
+            "refId": "B"
+          }
+        ],
+        "yAxes": [
+          {"format": "percent", "label": "Utilization", "logBase": 1, "min": 0, "max": 100},
+          {"format": "short", "label": "Connections", "logBase": 1, "min": 0}
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Weekly Usage Patterns",
+        "type": "heatmap",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24},
+        "targets": [
+          {
+            "expr": "increase(shared_storage_operations_total[1h])",
+            "legendFormat": "{{le}}",
+            "refId": "A"
+          }
+        ],
+        "heatmap": {
+          "buckets": 50
+        },
+        "cards": {
+          "cardPadding": null,
+          "cardRound": null
+        },
+        "color": {
+          "mode": "spectrum",
+          "cardColor": "#b4ff00",
+          "colorScale": "sqrt",
+          "exponent": 0.5,
+          "colorScheme": "interpolateSpectral"
+        },
+        "legend": {
+          "show": true
+        },
+        "dataFormat": "tsbuckets",
+        "xBucketSize": "1h",
+        "yBucketSize": "1day"
+      },
+      {
+        "id": 7,
+        "title": "Seasonal Analysis",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24},
+        "targets": [
+          {
+            "expr": "avg_over_time(rate(shared_storage_operations_total[1h])[7d:1h])",
+            "legendFormat": "7-Day Rolling Average",
+            "refId": "A"
+          },
+          {
+            "expr": "max_over_time(rate(shared_storage_operations_total[1h])[7d:1h])",
+            "legendFormat": "7-Day Peak Usage",
+            "refId": "B"
+          },
+          {
+            "expr": "min_over_time(rate(shared_storage_operations_total[1h])[7d:1h])",
+            "legendFormat": "7-Day Minimum Usage",
+            "refId": "C"
+          }
+        ],
+        "yAxes": [
+          {"format": "ops", "label": "Operations/Hour", "logBase": 1, "min": 0},
+          {"format": "short", "label": "", "logBase": 1}
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Forecasting: Next 7 Days",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 32},
+        "targets": [
+          {
+            "expr": "predict_linear(rate(shared_storage_operations_total[1h])[7d:1h], 7 * 24 * 3600)",
+            "legendFormat": "Predicted Operations",
+            "refId": "A"
+          },
+          {
+            "expr": "predict_linear(rate(shared_storage_file_access_total[1h])[7d:1h], 7 * 24 * 3600)",
+            "legendFormat": "Predicted File Access",
+            "refId": "B"
+          }
+        ],
+        "yAxes": [
+          {"format": "ops", "label": "Operations/Hour", "logBase": 1, "min": 0},
+          {"format": "short", "label": "", "logBase": 1}
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Capacity Planning Forecast",
+        "type": "table",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 32},
+        "targets": [
+          {
+            "expr": "predict_linear(shared_storage_storage_used_bytes[7d:1h], 30 * 24 * 3600) / 1024 / 1024 / 1024",
+            "legendFormat": "Predicted Storage (GB)",
+            "refId": "A"
+          },
+          {
+            "expr": "predict_linear(shared_storage_active_connections[7d:1h], 30 * 24 * 3600)",
+            "legendFormat": "Predicted Connections",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "align": "left",
+              "displayMode": "auto",
+              "filterable": true
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "orange", "value": 80},
+                {"color": "red", "value": 90}
+              ]
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "Time"},
+              "properties": [{"id": "displayName", "value": "Time"}]
+            },
+            {
+              "matcher": {"id": "byName", "options": "Value"},
+              "properties": [{"id": "displayName", "value": "Predicted Value"}]
+            }
+          ]
+        }
+      },
+      {
+        "id": 10,
+        "title": "Performance Regression Analysis",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 40},
+        "targets": [
+          {
+            "expr": "changes(histogram_quantile(0.95, rate(shared_storage_operation_duration_bucket[1h]))[7d:1h])",
+            "legendFormat": "P95 Response Time Changes",
+            "refId": "A"
+          },
+          {
+            "expr": "changes(rate(shared_storage_errors_total[1h])[7d:1h])",
+            "legendFormat": "Error Rate Changes",
+            "refId": "B"
+          }
+        ],
+        "yAxes": [
+          {"format": "short", "label": "Change Frequency", "logBase": 1, "min": 0},
+          {"format": "short", "label": "", "logBase": 1}
+        ]
+      },
+      {
+        "id": 11,
+        "title": "Resource Efficiency Trends",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 40},
+        "targets": [
+          {
+            "expr": "rate(shared_storage_operations_total[1h]) / shared_storage_cpu_usage_percent",
+            "legendFormat": "Operations per CPU %",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(shared_storage_operations_total[1h]) / shared_storage_memory_usage_bytes",
+            "legendFormat": "Operations per Memory Byte",
+            "refId": "B"
+          }
+        ],
+        "yAxes": [
+          {"format": "ops", "label": "Efficiency", "logBase": 1, "min": 0},
+          {"format": "short", "label": "", "logBase": 1}
+        ]
+      },
+      {
+        "id": 12,
+        "title": "Anomaly Detection",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 48},
+        "targets": [
+          {
+            "expr": "abs(rate(shared_storage_operations_total[1h]) - avg_over_time(rate(shared_storage_operations_total[1h])[7d:1h])) / stddev_over_time(rate(shared_storage_operations_total[1h])[7d:1h])",
+            "legendFormat": "Usage Anomaly Score",
+            "refId": "A"
+          },
+          {
+            "expr": "abs(histogram_quantile(0.95, rate(shared_storage_operation_duration_bucket[1h])) - avg_over_time(histogram_quantile(0.95, rate(shared_storage_operation_duration_bucket[1h]))[7d:1h])) / stddev_over_time(histogram_quantile(0.95, rate(shared_storage_operation_duration_bucket[1h]))[7d:1h])",
+            "legendFormat": "Latency Anomaly Score",
+            "refId": "B"
+          }
+        ],
+        "yAxes": [
+          {"format": "short", "label": "Anomaly Score", "logBase": 1, "min": 0},
+          {"format": "short", "label": "", "logBase": 1}
+        ],
+        "thresholds": [
+          {
+            "colorMode": "critical",
+            "op": "gt",
+            "value": 3,
+            "yaxis": "left"
+          }
+        ]
+      },
+      {
+        "id": 13,
+        "title": "Cost Optimization Analysis",
+        "type": "bargauge",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 48},
+        "targets": [
+          {
+            "expr": "rate(shared_storage_operations_total[24h]) / shared_storage_infrastructure_cost",
+            "legendFormat": "Operations per Cost Unit",
+            "refId": "A"
+          },
+          {
+            "expr": "shared_storage_cache_hit_rate_percent",
+            "legendFormat": "Cache Efficiency %",
+            "refId": "B"
+          },
+          {
+            "expr": "shared_storage_connection_pool_efficiency_percent",
+            "legendFormat": "Connection Pool Efficiency %",
+            "refId": "C"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "min": 0,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "orange", "value": 1000},
+                {"color": "green", "value": 5000}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 14,
+        "title": "Trend Summary & Recommendations",
+        "type": "text",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 56},
+        "options": {
+          "content": "# 📊 Trend Analysis Summary\n\n## Key Findings\n\n### Performance Trends\n- **Response Time**: ${__field.display(response_time_trend, 'N/A')} over the last 30 days\n- **Error Rate**: ${__field.display(error_rate_trend, 'N/A')} with ${__field.display(error_rate_change, 'N/A')}% change\n- **Cache Hit Rate**: ${__field.display(cache_hit_trend, 'N/A')} showing ${__field.display(cache_efficiency, 'N/A')}% efficiency\n\n### Usage Patterns\n- **Peak Hours**: Operations peak between ${__field.display(peak_hours, 'N/A')}\n- **Weekly Pattern**: ${__field.display(weekly_pattern, 'N/A')} usage distribution\n- **Growth Rate**: ${__field.display(growth_rate, 'N/A')}% month-over-month increase\n\n## Recommendations\n\n### Capacity Planning\n- **Storage**: ${__field.display(storage_forecast, 'N/A')} additional capacity needed in 30 days\n- **Compute**: ${__field.display(compute_forecast, 'N/A')} additional nodes recommended\n- **Network**: ${__field.display(network_forecast, 'N/A')} bandwidth increase suggested\n\n### Optimization Opportunities\n- **Cache**: ${__field.display(cache_recommendation, 'Consider increasing cache size')}\n- **Connection Pool**: ${__field.display(pool_recommendation, 'Optimize connection pool settings')}\n- **Load Balancing**: ${__field.display(balance_recommendation, 'Review load distribution')}\n\n### Risk Mitigation\n- **High Availability**: ${__field.display(availability_risk, 'Monitor closely')}\n- **Performance Degradation**: ${__field.display(performance_risk, 'Address immediately')}\n- **Cost Optimization**: ${__field.display(cost_risk, 'Review resource allocation')}\n\n## Next Steps\n1. Review capacity planning recommendations\n2. Implement identified optimizations\n3. Monitor key metrics for continued health\n4. Schedule regular trend analysis reviews\n\n*Last updated: ${__from:date:YYYY-MM-DD HH:mm:ss} to ${__to:date:YYYY-MM-DD HH:mm:ss}*",
+          "mode": "markdown"
+        }
+      }
+    ],
+    "time": {
+      "from": "now-30d",
+      "to": "now"
+    },
+    "timepicker": {
+      "refresh_intervals": ["5m", "15m", "30m", "1h", "2h", "1d"]
+    },
+    "templating": {
+      "list": [
+        {
+          "name": "time_range",
+          "type": "interval",
+          "query": "1h,6h,12h,24h,7d,30d",
+          "label": "Time Range",
+          "auto": false,
+          "auto_count": 30,
+          "auto_min": "10s",
+          "current": {"selected": true, "text": "7d", "value": "7d"}
+        },
+        {
+          "name": "percentile",
+          "type": "custom",
+          "query": "50,95,99",
+          "label": "Percentile",
+          "multi": false,
+          "current": {"selected": true, "text": "95", "value": "95"}
+        }
+      ]
+    },
+    "annotations": {
+      "list": [
+        {
+          "builtIn": 1,
+          "datasource": "-- Grafana --",
+          "enable": true,
+          "hide": true,
+          "iconColor": "rgba(0, 211, 255, 1)",
+          "name": "Annotations & Alerts",
+          "type": "dashboard"
+        },
+        {
+          "datasource": "prometheus",
+          "enable": true,
+          "expr": "changes(rate(shared_storage_operations_total[1h])[1h]) > 2",
+          "hide": false,
+          "iconColor": "orange",
+          "name": "Usage Pattern Changes",
+          "textFormat": "Significant change in usage pattern detected"
+        }
+      ]
+    },
+    "refresh": "1h",
+    "schemaVersion": 27,
+    "version": 0,
+    "links": [
+      {
+        "title": "Capacity Planning Report",
+        "type": "link",
+        "url": "/reports/capacity-planning",
+        "targetBlank": true
+      },
+      {
+        "title": "Performance Optimization Guide",
+        "type": "link",
+        "url": "/docs/performance-optimization",
+        "targetBlank": true
+      }
+    ]
+  }
+}

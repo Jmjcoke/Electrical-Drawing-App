@@ -1,0 +1,377 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Shared Storage Service - Operational",
+    "description": "Operational dashboard for on-call engineers with critical alerts, system health, and troubleshooting information",
+    "tags": ["shared-storage", "operational", "on-call", "alerts"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "🚨 ACTIVE ALERTS",
+        "type": "table",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "ALERTS{alertname=~\"SharedStorage.*\", alertstate=\"firing\"}",
+            "legendFormat": "{{alertname}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "align": "left",
+              "displayMode": "auto",
+              "filterable": true
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "red", "value": 1}
+              ]
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "Time"},
+              "properties": [{"id": "displayName", "value": "Alert Time"}]
+            },
+            {
+              "matcher": {"id": "byName", "options": "Value"},
+              "properties": [{"id": "displayName", "value": "Severity"}]
+            }
+          ]
+        },
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {},
+              "indexByName": {},
+              "renameByName": {
+                "alertname": "Alert Name",
+                "severity": "Severity",
+                "description": "Description",
+                "summary": "Summary"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "System Health Status",
+        "type": "stat",
+        "gridPos": {"h": 6, "w": 6, "x": 0, "y": 8},
+        "targets": [
+          {
+            "expr": "shared_storage_health_status",
+            "legendFormat": "Overall Health",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [
+              {
+                "options": {
+                  "0": {
+                    "text": "UNHEALTHY",
+                    "color": "red"
+                  },
+                  "1": {
+                    "text": "DEGRADED",
+                    "color": "orange"
+                  },
+                  "2": {
+                    "text": "HEALTHY",
+                    "color": "green"
+                  }
+                },
+                "type": "value"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "Circuit Breaker Status",
+        "type": "stat",
+        "gridPos": {"h": 6, "w": 6, "x": 6, "y": 8},
+        "targets": [
+          {
+            "expr": "shared_storage_circuit_breaker_state",
+            "legendFormat": "{{service}}_{{operation}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [
+              {
+                "options": {
+                  "0": {
+                    "text": "CLOSED",
+                    "color": "green"
+                  },
+                  "1": {
+                    "text": "OPEN",
+                    "color": "red"
+                  },
+                  "2": {
+                    "text": "HALF-OPEN",
+                    "color": "orange"
+                  }
+                },
+                "type": "value"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "Error Rate Trend",
+        "type": "stat",
+        "gridPos": {"h": 6, "w": 6, "x": 12, "y": 8},
+        "targets": [
+          {
+            "expr": "rate(shared_storage_errors_total[5m])",
+            "legendFormat": "Errors/min",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "orange", "value": 5},
+                {"color": "red", "value": 10}
+              ]
+            },
+            "unit": "errors/min"
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "P95 Response Time",
+        "type": "stat",
+        "gridPos": {"h": 6, "w": 6, "x": 18, "y": 8},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(shared_storage_operation_duration_bucket[5m]))",
+            "legendFormat": "P95 Latency",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "orange", "value": 100},
+                {"color": "red", "value": 500}
+              ]
+            },
+            "unit": "ms"
+          }
+        }
+      },
+      {
+        "id": 6,
+        "title": "Recent Errors (Last 15 minutes)",
+        "type": "logs",
+        "gridPos": {"h": 12, "w": 12, "x": 0, "y": 14},
+        "targets": [
+          {
+            "expr": "{job=\"shared-storage-service\"} |= \"ERROR\"",
+            "legendFormat": "",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "showTime": true,
+          "showLabels": false,
+          "showCommonLabels": false,
+          "wrapLogMessage": true,
+          "prettifyLogMessage": true,
+          "enableLogDetails": true,
+          "dedupStrategy": "none",
+          "sortOrder": "Descending"
+        }
+      },
+      {
+        "id": 7,
+        "title": "Top Error Types",
+        "type": "piechart",
+        "gridPos": {"h": 12, "w": 6, "x": 12, "y": 14},
+        "targets": [
+          {
+            "expr": "topk(10, increase(shared_storage_errors_total[15m]))",
+            "legendFormat": "{{error_type}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "red", "value": 10}
+              ]
+            }
+          }
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "orientation": "auto",
+          "textMode": "auto",
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto"
+        }
+      },
+      {
+        "id": 8,
+        "title": "Service Dependencies",
+        "type": "nodeGraph",
+        "gridPos": {"h": 12, "w": 6, "x": 18, "y": 14},
+        "targets": [
+          {
+            "expr": "shared_storage_service_dependencies",
+            "legendFormat": "{{source}} -> {{target}}",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Performance Degradation Alert",
+        "type": "alertlist",
+        "gridPos": {"h": 8, "w": 8, "x": 0, "y": 26},
+        "options": {
+          "showOptions": "current",
+          "alertName": "SharedStorage.*Performance.*",
+          "dashboardAlerts": false,
+          "alertInstanceLabelFilter": "",
+          "maxItems": 10
+        }
+      },
+      {
+        "id": 10,
+        "title": "Error Rate Alert",
+        "type": "alertlist",
+        "gridPos": {"h": 8, "w": 8, "x": 8, "y": 26},
+        "options": {
+          "showOptions": "current",
+          "alertName": "SharedStorage.*Error.*",
+          "dashboardAlerts": false,
+          "alertInstanceLabelFilter": "",
+          "maxItems": 10
+        }
+      },
+      {
+        "id": 11,
+        "title": "Circuit Breaker Alert",
+        "type": "alertlist",
+        "gridPos": {"h": 8, "w": 8, "x": 16, "y": 26},
+        "options": {
+          "showOptions": "current",
+          "alertName": "SharedStorage.*Circuit.*",
+          "dashboardAlerts": false,
+          "alertInstanceLabelFilter": "",
+          "maxItems": 10
+        }
+      },
+      {
+        "id": 12,
+        "title": "Troubleshooting Guide",
+        "type": "text",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 34},
+        "options": {
+          "content": "# 🔧 Troubleshooting Guide\n\n## Common Issues & Solutions\n\n### High Error Rate\n- Check service dependencies\n- Review recent deployments\n- Examine circuit breaker status\n- Monitor resource utilization\n\n### Performance Degradation\n- Analyze cache hit rates\n- Check connection pool status\n- Review error patterns\n- Examine volume health\n\n### Circuit Breaker Open\n- Investigate underlying service issues\n- Check error rates for affected operations\n- Monitor recovery attempts\n- Review circuit breaker configuration\n\n### Resource Exhaustion\n- Monitor active connections\n- Check cache utilization\n- Review memory usage patterns\n- Examine volume capacity\n\n## Quick Actions\n1. **Restart Service**: `docker restart shared-storage-service`\n2. **Clear Cache**: `POST /api/v1/cache/clear`\n3. **Reset Circuit Breaker**: `POST /api/v1/circuit-breaker/reset`\n4. **View Detailed Health**: `GET /health/detailed`\n\n## Escalation Contacts\n- **DevOps**: @devops-team\n- **Backend**: @backend-team\n- **Infrastructure**: @infra-team",
+          "mode": "markdown"
+        }
+      }
+    ],
+    "time": {
+      "from": "now-15m",
+      "to": "now"
+    },
+    "timepicker": {},
+    "templating": {
+      "list": [
+        {
+          "name": "environment",
+          "type": "custom",
+          "query": "production,staging,development",
+          "label": "Environment",
+          "multi": false,
+          "current": {"selected": true, "text": "production", "value": "production"}
+        },
+        {
+          "name": "cluster",
+          "type": "query",
+          "query": "label_values(shared_storage_service_info, cluster)",
+          "label": "Cluster",
+          "multi": false,
+          "includeAll": true
+        }
+      ]
+    },
+    "annotations": {
+      "list": [
+        {
+          "builtIn": 1,
+          "datasource": "-- Grafana --",
+          "enable": true,
+          "hide": true,
+          "iconColor": "rgba(0, 211, 255, 1)",
+          "name": "Annotations & Alerts",
+          "type": "dashboard"
+        },
+        {
+          "datasource": "prometheus",
+          "enable": true,
+          "expr": "ALERTS{alertname=~\"SharedStorage.*\", alertstate=\"firing\"}",
+          "hide": false,
+          "iconColor": "red",
+          "name": "Active Alerts",
+          "textFormat": "{{alertname}}: {{description}}"
+        }
+      ]
+    },
+    "refresh": "30s",
+    "schemaVersion": 27,
+    "version": 0,
+    "links": [
+      {
+        "title": "Service Documentation",
+        "type": "link",
+        "url": "/docs/shared-storage-service",
+        "targetBlank": true
+      },
+      {
+        "title": "Runbook",
+        "type": "link",
+        "url": "/runbooks/shared-storage-troubleshooting",
+        "targetBlank": true
+      }
+    ]
+  }
+}

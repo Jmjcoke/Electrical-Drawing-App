@@ -1,0 +1,199 @@
+version: '3.8'
+
+services:
+  # File Processor Service
+  file-processor:
+    build:
+      context: ./backend/services/file-processor
+      dockerfile: Dockerfile
+    container_name: electrical_file_processor
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - NODE_ENV=production
+      - STORAGE_BASE=/app/storage
+      - UPLOAD_DIR=/app/uploads
+      - REDIS_URL=redis://redis:6379
+      - LOG_LEVEL=info
+      - TEMP_FILE_EXPIRY_HOURS=24
+    volumes:
+      # Shared session storage volume
+      - shared_sessions:/app/storage/sessions
+      # Local upload directory
+      - file_uploads:/app/uploads
+      # Logs directory
+      - file_processor_logs:/app/logs
+    depends_on:
+      - redis
+    networks:
+      - electrical_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # LLM Orchestrator Service  
+  llm-orchestrator:
+    build:
+      context: ./backend/services/llm-orchestrator
+      dockerfile: Dockerfile
+    container_name: electrical_llm_orchestrator
+    restart: unless-stopped
+    ports:
+      - "3002:3002"
+    environment:
+      - PORT=3002
+      - NODE_ENV=production
+      - STORAGE_BASE=/app/storage
+      - REDIS_URL=redis://redis:6379
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - CLAUDE_API_KEY=${CLAUDE_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - LOG_LEVEL=info
+      - DATABASE_URL=${DATABASE_URL}
+    volumes:
+      # Shared session storage volume (read-only for security)
+      - shared_sessions:/app/storage/sessions:ro
+      # Logs directory
+      - llm_orchestrator_logs:/app/logs
+    depends_on:
+      - redis
+      - file-processor
+    networks:
+      - electrical_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3002/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Memory Service (Neo4j + Python service)
+  neo4j:
+    image: neo4j:5.15
+    container_name: electrical_memory_neo4j
+    restart: unless-stopped
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      NEO4J_AUTH: neo4j/password
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_dbms_security_procedures_unrestricted: apoc.*
+      NEO4J_dbms_memory_heap_initial_size: 512m
+      NEO4J_dbms_memory_heap_max_size: 1G
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+    networks:
+      - electrical_network
+    healthcheck:
+      test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "password", "RETURN 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  memory-service:
+    build:
+      context: ./backend/services/memory-service
+      dockerfile: Dockerfile
+    container_name: electrical_memory_service
+    restart: unless-stopped
+    ports:
+      - "8002:8002"
+    environment:
+      - NEO4J_URI=bolt://neo4j:7687
+      - NEO4J_USERNAME=neo4j
+      - NEO4J_PASSWORD=password
+      - PORT=8002
+      - LOG_LEVEL=INFO
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    depends_on:
+      neo4j:
+        condition: service_healthy
+    networks:
+      - electrical_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Redis for caching and queues
+  redis:
+    image: redis:7-alpine
+    container_name: electrical_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - electrical_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: electrical_postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: electrical_drawing_app
+      POSTGRES_USER: electrical_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-electrical_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/migrations:/docker-entrypoint-initdb.d
+    networks:
+      - electrical_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U electrical_user -d electrical_drawing_app"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  # Shared session storage - THE KEY VOLUME FOR CROSS-SERVICE FILE ACCESS
+  shared_sessions:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${PWD}/backend/services/file-processor/backend/storage/sessions
+
+  # Service-specific volumes
+  file_uploads:
+    driver: local
+    driver_opts:
+      type: none  
+      o: bind
+      device: ${PWD}/backend/services/file-processor/uploads
+
+  # Application data volumes
+  neo4j_data:
+  neo4j_logs:
+  redis_data:
+  postgres_data:
+  file_processor_logs:
+  llm_orchestrator_logs:
+
+networks:
+  electrical_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
